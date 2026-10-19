@@ -225,7 +225,7 @@ create index on calorie_targets (user_id, created_at desc);
 - 저장값은 `calorie_targets`에 `model_id`·`prompt_version`·입력값과 함께 남긴다. 프롬프트가 바뀌어도 기존 목표는 소급하지 않는다.
 
 ### 7.2 체중 추세
-- 추세: 일별 체중의 지수이동평균(`packages/domain`). 평활 계수 미확정
+- 추세: 일별 체중의 지수이동평균(`packages/domain`). 평활 계수 α = 0.1(`params.ts`, 써 보면서 조정)
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)

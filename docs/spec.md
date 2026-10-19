@@ -69,7 +69,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
 ```
 - DB 접근: `@neondatabase/serverless`(HTTP), ORM 없이 SQL. 여러 문장을 묶어야 하는 곳(온보딩)은 드라이버의 트랜잭션 API 사용.
 - 마이그레이션: `apps/api/migrations/NNNN_*.sql` 순번 파일 + 적용 스크립트(`pnpm --filter @kkilog/api migrate`는 미적용 목록만 표시, `--apply`를 붙여야 적용). 파일마다 한 트랜잭션. 적용 이력은 `kkilog.schema_migrations`에 기록. 모든 객체 이름은 `kkilog.`으로 한정해서 쓴다(`tests/migrations.test.ts`가 검사).
-- 리뷰·검증용 DB는 Neon 브랜치로 만든다(운영 데이터 복제 없이 스키마만 적용해서 확인). CI는 DB에 접속하지 않는다.
+- DB는 운영·preview·로컬 모두 하나(기존 Neon 프로젝트의 기본 브랜치)를 같이 쓴다. 개발 중 생긴 테스트 데이터는 운영자가 정리한다. 마이그레이션은 임시 Postgres(예: PGlite)에서 먼저 확인한 뒤 적용한다. CI는 DB에 접속하지 않는다.
 - 디렉터리
   - `apps/mobile/app/` — expo-router 화면 (`(auth)/`, `onboarding`, `(main)/`)
   - `apps/mobile/src/api/` — fetch 래퍼(토큰 첨부, 401 시 refresh, 실패 시 로그인으로)
@@ -96,7 +96,6 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - 사용자 id 타입과 사용자 테이블 위치 → `kkilog` 테이블의 `user_id` 타입·FK 확정
   - 세션 모델이 access/refresh 2토큰인지 단일 세션 토큰(만료 연장)인지 → `/api/auth/refresh` 계약 확정
   - 기본 메일 발송을 운영에서 써도 되는지(발송 한도·개발용 제한 여부)
-  - Neon 브랜치(preview·로컬)에서 `neon_auth` 사용자 데이터가 어떻게 분리·복제되는지
   - 위가 안 되면 대안: 자체 OTP 테이블 + 메일 발송 서비스(새 의존성이라 승인 필요)
 
 ## 5. 데이터 모델 (초안 — 확정 시 마이그레이션)
@@ -263,7 +262,7 @@ create index on calorie_targets (user_id, created_at desc);
 
 ## 9. 빌드·배포
 - API: Vercel(`apps/api`), `dev` → preview, `main` → 운영
-- DB: 운영은 기존 Neon 프로젝트의 기본 브랜치. preview·로컬은 Neon 브랜치를 따로 만들어 `DATABASE_URL`로 분리
+- DB: 운영·preview·로컬 모두 기존 Neon 프로젝트의 기본 브랜치 하나. 같은 `DATABASE_URL`을 쓴다
 - Vercel Blob: preview·운영 store 분리. Hobby 플랜에서 private store·서명 URL이 되는지 PR 5에서 먼저 확인하고, 안 되면 API가 사진을 대신 내려주는 프록시 라우트로 대체(앱에 Blob URL을 노출하지 않는 원칙은 유지)
 - APK: EAS Build(무료 플랜 월 빌드 횟수 제한) 또는 로컬 `expo prebuild` + Gradle 빌드. 서명 키스토어는 저장소에 넣지 않는다.
 - JS만 바뀐 수정은 EAS Update(OTA)로 배포해 재설치 없이 반영. 네이티브 모듈이 바뀌면 APK 재배포.

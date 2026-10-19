@@ -13,7 +13,7 @@ pnpm 워크스페이스 모노레포
 ## 스택 (고정 — 새 의존성은 추가 전에 확인받을 것)
 - 앱: Expo(최신 안정 SDK), expo-router(+ 필수 peer: react-native-safe-area-context, react-native-screens, expo-linking, expo-constants), expo-image-picker, expo-image-manipulator, expo-secure-store, expo-updates(OTA), react-native-svg(추세 차트 — 차트 라이브러리 없이 직접 그림)
 - 서버: Next.js(App Router Route Handler), Gemini API 무료 티어(구조화 출력)
-- DB: Neon Postgres(기존 프로젝트) — `@neondatabase/serverless`, ORM 없이 SQL. 이 앱의 테이블은 전부 `meallog` 스키마
+- DB: Neon Postgres(기존 프로젝트) — `@neondatabase/serverless`, ORM 없이 SQL. 이 앱의 테이블은 전부 `kkilog` 스키마
 - 인증: Neon Auth(Managed Better Auth) 이메일 OTP
 - 사진: Vercel Blob private store + 서명 URL
 - Gemini 모델 ID는 서버 환경변수 `GEMINI_MODEL`로만 지정
@@ -22,7 +22,7 @@ pnpm 워크스페이스 모노레포
 ## 절대 규칙
 - 앱은 Neon(DB·Auth)·Vercel Blob·Gemini를 직접 호출하지 않는다. 인증·DB·사진·LLM은 전부 `apps/api`를 거친다. `apps/mobile`과 `packages/contracts`는 `@neondatabase/*`, `@vercel/blob`, `@google/genai`, `packages/domain`을 import하면 안 된다 — 의존성 경계 테스트(`tests/dependency-boundary.test.ts`)를 깨지 않는다.
 - APK는 디컴파일된다고 가정한다. 비밀 값(`DATABASE_URL`, Neon Auth 키, `BLOB_READ_WRITE_TOKEN`, `GEMINI_API_KEY`)은 서버 환경변수에만 둔다. 앱에는 `EXPO_PUBLIC_API_BASE_URL` 외의 환경변수를 넣지 않는다.
-- 기존 Neon 프로젝트를 같이 쓰되 `meallog` 스키마로 완전히 분리해 운영한다. 마이그레이션은 `meallog` 스키마 안에서만 하고, 기존 서비스의 스키마는 건드리지도 참조하지도 않는다. `neon_auth`는 읽기만 한다.
+- 기존 Neon 프로젝트를 같이 쓰되 `kkilog` 스키마로 완전히 분리해 운영한다. 마이그레이션은 `kkilog` 스키마 안에서만 하고, 기존 서비스의 스키마는 건드리지도 참조하지도 않는다. `neon_auth`는 읽기만 한다.
 - 사진·대용량 데이터는 DB에 넣지 않는다(무료 플랜 저장 한도를 넘으면 프로젝트 전체가 정지된다).
 - 앱의 인증 토큰은 `expo-secure-store`에만 저장하고 `Authorization: Bearer` 헤더로 보낸다. URL에 토큰을 넣지 않는다.
 - 모든 쿼리는 토큰에서 꺼낸 `user_id`로 범위를 제한한다. 요청 body·query로 받은 user_id는 쓰지 않는다.

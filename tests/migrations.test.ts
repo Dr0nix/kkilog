@@ -32,17 +32,17 @@ describe('writeTargets', () => {
       'create table if not exists public.a (id int);',
       'create unique index a_idx on neon_auth.users (id);',
       'alter table b add column c int;',
-      'insert into meallog.c values (1);',
+      'insert into kkilog.c values (1);',
       'update other.d set x = 1;',
     ].join('\n');
     expect(writeTargets(sql)).toEqual(
-      expect.arrayContaining(['public.a', 'neon_auth.users', 'b', 'meallog.c', 'other.d']),
+      expect.arrayContaining(['public.a', 'neon_auth.users', 'b', 'kkilog.c', 'other.d']),
     );
   });
 
   it('FK의 on update / on delete는 대상으로 보지 않는다', () => {
-    const sql = 'create table meallog.x (y uuid references meallog.z (id) on update cascade on delete cascade);';
-    expect(writeTargets(sql)).toEqual(['meallog.x']);
+    const sql = 'create table kkilog.x (y uuid references kkilog.z (id) on update cascade on delete cascade);';
+    expect(writeTargets(sql)).toEqual(['kkilog.x']);
   });
 });
 
@@ -61,13 +61,13 @@ describe('마이그레이션 파일', () => {
   describe.each(files)('%s', (name) => {
     const sql = stripComments(readFileSync(join(DIR, name), 'utf8'));
 
-    it('meallog 스키마 안의 객체만 만들거나 바꾼다', () => {
-      expect(writeTargets(sql).filter((t) => !t.startsWith('meallog.'))).toEqual([]);
+    it('kkilog 스키마 안의 객체만 만들거나 바꾼다', () => {
+      expect(writeTargets(sql).filter((t) => !t.startsWith('kkilog.'))).toEqual([]);
     });
 
-    it('참조는 meallog 또는 neon_auth(읽기 전용)만 한다', () => {
+    it('참조는 kkilog 또는 neon_auth(읽기 전용)만 한다', () => {
       expect(
-        referenceTargets(sql).filter((t) => !t.startsWith('meallog.') && !t.startsWith('neon_auth.')),
+        referenceTargets(sql).filter((t) => !t.startsWith('kkilog.') && !t.startsWith('neon_auth.')),
       ).toEqual([]);
     });
 

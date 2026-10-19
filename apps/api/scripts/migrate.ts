@@ -32,11 +32,11 @@ try {
   console.log(`대상 DB: ${host}${pathname}`);
 
   const { rows: exists } = await client.query<{ table: string | null }>(
-    "select to_regclass('meallog.schema_migrations')::text as table",
+    "select to_regclass('kkilog.schema_migrations')::text as table",
   );
   const applied = new Set<string>();
   if (exists[0]?.table) {
-    const { rows } = await client.query<{ version: string }>('select version from meallog.schema_migrations');
+    const { rows } = await client.query<{ version: string }>('select version from kkilog.schema_migrations');
     for (const row of rows) applied.add(row.version);
   }
 
@@ -48,16 +48,16 @@ try {
     for (const name of pending) console.log(`  ${name}`);
     console.log('적용하려면 --apply를 붙여 다시 실행하세요.');
   } else {
-    await client.query('create schema if not exists meallog');
+    await client.query('create schema if not exists kkilog');
     await client.query(
-      'create table if not exists meallog.schema_migrations (version text primary key, applied_at timestamptz not null default now())',
+      'create table if not exists kkilog.schema_migrations (version text primary key, applied_at timestamptz not null default now())',
     );
     for (const name of pending) {
       const version = name.replace(/\.sql$/, '');
       await client.query('begin');
       try {
         await client.query(readFileSync(join(MIGRATIONS_DIR, name), 'utf8'));
-        await client.query('insert into meallog.schema_migrations (version) values ($1)', [version]);
+        await client.query('insert into kkilog.schema_migrations (version) values ($1)', [version]);
         await client.query('commit');
         console.log(`적용: ${name}`);
       } catch (error) {

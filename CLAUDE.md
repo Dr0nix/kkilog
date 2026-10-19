@@ -11,7 +11,7 @@ pnpm 워크스페이스 모노레포
 - `packages/contracts` — API 요청·응답 zod 스키마와 타입. 양쪽에서 import
 
 ## 스택 (고정 — 새 의존성은 추가 전에 확인받을 것)
-- 앱: Expo(최신 안정 SDK), expo-router, expo-image-picker, expo-image-manipulator, expo-secure-store, expo-updates(OTA), react-native-svg(추세 차트 — 차트 라이브러리 없이 직접 그림)
+- 앱: Expo(최신 안정 SDK), expo-router(+ 필수 peer: react-native-safe-area-context, react-native-screens, expo-linking, expo-constants), expo-image-picker, expo-image-manipulator, expo-secure-store, expo-updates(OTA), react-native-svg(추세 차트 — 차트 라이브러리 없이 직접 그림)
 - 서버: Next.js(App Router Route Handler), Gemini API 무료 티어(구조화 출력)
 - DB: Neon Postgres(기존 프로젝트) — `@neondatabase/serverless`, ORM 없이 SQL. 이 앱의 테이블은 전부 `meallog` 스키마
 - 인증: Neon Auth(Managed Better Auth) 이메일 OTP

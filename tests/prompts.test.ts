@@ -9,6 +9,7 @@ const DIR = resolve(import.meta.dirname, '..', 'apps', 'api', 'prompts');
 // 머지 전(아직 배포 안 된) 버전만 해시를 고쳐도 된다.
 const LOCKED: Record<string, string> = {
   'calorie-target/v1.md': '0f0e347b29dec5377d3b7005408148db694684bb626d6a7d4a33839ee649a050',
+  'meal-analysis/v1.md': '4ae60e83295950690e88417365aee9eba10b483676b71812813e39277db2567e',
 };
 
 const files = readdirSync(DIR, { withFileTypes: true })

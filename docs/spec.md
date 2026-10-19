@@ -28,6 +28,7 @@
 | 현재 몸무게 | kg | 첫 `weight_logs` 행 | 20.0~300.0 |
 | 목표 몸무게 | kg | `profiles.target_weight_kg` | 20.0~300.0 |
 | 운동 정도 | 1~5 중 선택 | `profiles.activity_level` | 1~5 |
+| 목표 기간 | 몇 개월 안에 | `profiles.goal_months` | 1~24 |
 - 운동 정도 보기(사용자가 스스로 고른다)
   1. 거의 안 움직임 — 앉아서 일하고 운동 안 함
   2. 가벼움 — 주 1~2회 가벼운 운동
@@ -36,8 +37,9 @@
   5. 매우 활발 — 매일 고강도 운동 또는 육체노동
 - 나이는 해가 바뀌면 달라지므로 출생연도로 바꿔 저장한다(±1세 오차는 감수).
 - 하루 목표 칼로리는 온보딩 때 Gemini가 정한다(7절). 순서: Gemini 호출 → 성공하면 프로필·첫 체중·목표 칼로리를 한 트랜잭션으로 저장. Gemini가 실패하면 아무것도 저장하지 않고 재시도 가능한 오류를 돌려준다. 이미 프로필이 있으면 409.
-- 온보딩 직후 홈에 목표 칼로리가 바로 보여야 한다.
-- 프로필 수정 화면에서 같은 항목을 고칠 수 있다(몸무게는 제외 — 체중 기록으로 남김). 목표 칼로리에 영향을 주는 항목(성별·나이·키·목표 몸무게·운동 정도)을 바꾸면 그 시점의 최근 체중으로 목표 칼로리를 다시 정한다.
+- 목표 기간은 목표 칼로리를 정하는 시점부터 센다.
+- 온보딩 직후 홈에 목표 칼로리가 바로 보여야 한다. 하한으로 조정됐다면(7.1) "기간 안에 도달하려면 하한보다 적게 먹어야 해서 하한으로 맞췄다"는 안내와 하한 기준 예상 도달 기간을 함께 보여준다.
+- 프로필 수정 화면에서 같은 항목을 고칠 수 있다(몸무게는 제외 — 체중 기록으로 남김). 목표 칼로리에 영향을 주는 항목(성별·나이·키·목표 몸무게·운동 정도·목표 기간)을 바꾸면 그 시점의 최근 체중으로 목표 칼로리를 다시 정한다. 이때 목표 기간은 그 시점부터 다시 센다.
 
 ### 2.3 홈 (대시보드)
 - 오늘 섭취 kcal / 목표 kcal, 탄·단·지 합계
@@ -115,6 +117,7 @@ create table profiles (
   height_cm numeric(4,1) not null check (height_cm between 100 and 250),
   target_weight_kg numeric(4,1) not null check (target_weight_kg between 20 and 300),
   activity_level smallint not null check (activity_level between 1 and 5),
+  goal_months smallint not null check (goal_months between 1 and 24),
   timezone text not null default 'Asia/Seoul',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -167,9 +170,12 @@ create index on meal_analyses (entry_id, created_at desc);
 create table calorie_targets (            -- 목표 칼로리 이력. 덮어쓰지 않고 누적
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references profiles,
-  kcal int not null,                      -- 서버가 허용 범위(params.ts) 검증 후 저장
+  kcal int not null,                      -- 최종값. 하한 미만이면 하한으로 맞춘 값
+  llm_kcal int not null,                  -- Gemini가 준 원래 값
+  maintenance_kcal int not null,          -- Gemini가 추정한 유지 칼로리
+  clamped boolean not null,               -- 하한으로 맞췄는지
   reason text,                            -- Gemini가 준 근거 한두 줄
-  inputs jsonb not null,                  -- 계산에 쓴 성별·나이·키·체중·목표 체중·운동 정도
+  inputs jsonb not null,                  -- 계산에 쓴 성별·나이·키·체중·목표 체중·운동 정도·목표 기간
   model_id text not null,
   prompt_version text not null,
   raw_response jsonb,
@@ -214,14 +220,17 @@ create index on calorie_targets (user_id, created_at desc);
 ## 7. 목표 칼로리와 체중 추세
 ### 7.1 목표 칼로리 (Gemini가 정하고 저장)
 - 정하는 시점: 온보딩, 그리고 프로필 수정에서 관련 항목이 바뀌었을 때. 매일 다시 계산하지 않는다(체중 기록만으로는 바뀌지 않음).
-- 입력: 성별, 나이, 키, 최근 체중, 목표 체중, 운동 정도(1~5)
+- 입력: 성별, 나이, 키, 최근 체중, 목표 체중, 운동 정도(1~5), 목표 기간(개월)
 - Gemini 구조화 출력, temperature 0. 프롬프트는 `apps/api/prompts/calorie-target/v*.md`(끼니 분석과 별도 버전 관리)
 - LLM 출력 스키마
   ```json
-  { "kcal": 1850, "reason": "BMR 약 1,450 × 활동 1.375 − 감량 적자 약 150" }
+  { "maintenance_kcal": 2400, "kcal": 1850, "reason": "유지 칼로리 약 2,400 − (10kg × 7,700 ÷ 140일) ≈ 1,850" }
   ```
-- 산식(BMR 공식, 활동계수, 적자·잉여 폭)은 프롬프트에서 Gemini가 판단한다. 증량 목표(목표 > 현재)도 Gemini가 판단한다.
-- 서버 검증: zod 검증 + `kcal`이 허용 범위(1,200~4,000 kcal, `params.ts`) 안인지 확인. 범위를 벗어나면 실패로 처리하고 저장하지 않는다(임의로 잘라서 저장하지 않음).
+- 기준: 목표 기간 안에 목표 체중에 도달하는 하루 섭취량. 유지 칼로리(BMR 공식·활동계수)는 Gemini가 판단하고, 적자·잉여는 체중 차이와 목표 기간으로 정한다(지방 1kg ≈ 7,700kcal). 증량 목표(목표 > 현재)도 같은 방식.
+- 서버 처리(`packages/domain`, 순수 함수): zod 검증 후
+  - `kcal` < 하한 1,200 → **하한 1,200으로 맞춰 저장**하고 `clamped = true`. 예상 도달 기간은 서버가 `체중 차이 × 7,700 ÷ (maintenance_kcal − 1,200)`로 다시 계산해 응답에 넣는다(`maintenance_kcal`이 하한 이하라 감량이 안 되는 경우엔 기간 없음).
+  - `kcal` > 상한 4,000 → Gemini 응답 이상으로 보고 실패 처리(저장 안 함, 재시도 가능)
+  - 하한·상한은 `params.ts`
 - 저장값은 `calorie_targets`에 `model_id`·`prompt_version`·입력값과 함께 남긴다. 프롬프트가 바뀌어도 기존 목표는 소급하지 않는다.
 
 ### 7.2 체중 추세
@@ -234,7 +243,7 @@ create index on calorie_targets (user_id, created_at desc);
 | POST | /api/auth/otp | 코드 발송 (허용 이메일만, 응답 동일) |
 | POST | /api/auth/verify | 코드 검증 → access/refresh 토큰 + `has_profile` |
 | POST | /api/auth/refresh | 토큰 갱신 |
-| POST | /api/onboarding | 프로필(운동 정도 포함) + 첫 체중 → Gemini 목표 칼로리 → 한 트랜잭션 저장. 이미 있으면 409, Gemini 실패 시 재시도 가능한 오류 |
+| POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리(하한 보정) → 한 트랜잭션 저장. 응답에 목표 칼로리·하한 보정 여부·예상 도달 기간. 이미 있으면 409, Gemini 실패 시 재시도 가능한 오류 |
 | GET/PATCH | /api/profile | 프로필 조회·수정. 목표 칼로리 관련 항목이 바뀌면 목표 칼로리를 다시 정해 함께 저장 |
 | GET | /api/home?date= | 해당일 섭취 합계·목표·끼니 목록(태그, 서명 사진 URL, 분석 상태)·체중 기록 여부 |
 | POST | /api/meals | multipart: meal_type, photo?, text?, client_request_id → 원본 저장 + 분석 → 결과. 중복이면 기존 결과 200 |

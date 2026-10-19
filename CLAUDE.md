@@ -28,7 +28,7 @@ pnpm 워크스페이스 모노레포
 - 모든 쿼리는 토큰에서 꺼낸 `user_id`로 범위를 제한한다. 요청 body·query로 받은 user_id는 쓰지 않는다.
 - 없는 리소스와 남의 리소스는 둘 다 404.
 - 칼로리 합계·추세는 서버에서 `packages/domain`으로 계산한다. LLM이 준 합계, 앱이 보낸 계산값은 저장하지 않는다.
-- 하루 목표 칼로리는 예외로 Gemini가 정한다(온보딩·프로필 수정 때만). 서버가 허용 범위를 검증한 뒤 `model_id`·`prompt_version`·입력값과 함께 저장하고, 범위를 벗어나면 저장하지 않는다.
+- 하루 목표 칼로리는 예외로 Gemini가 정한다(온보딩·프로필 수정 때만). 서버가 `packages/domain`에서 하한 미만이면 하한으로 맞추고(`clamped`), 상한 초과면 저장하지 않는다. Gemini 원래 값·`model_id`·`prompt_version`·입력값을 함께 저장한다.
 - 사진은 Vercel Blob private store에 저장하고, 앱엔 짧게 유효한 서명 URL로만 내려준다.
 - 개인 데이터 응답엔 `Cache-Control: private, no-store`.
 - 같은 `client_request_id`로 다시 온 기록 요청은 새로 만들지 않고 기존 리소스를 200으로 돌려준다.

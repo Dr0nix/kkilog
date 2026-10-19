@@ -1,3 +1,4 @@
 export * from './v1/params';
 export * from './v1/calorie-target';
 export * from './v1/dates';
+export * from './v1/meal';

@@ -198,6 +198,7 @@ create index on meal_analyses (entry_id, created_at desc);
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
 | Method | Path | 설명 |
 | --- | --- | --- |
+| GET | /api/health | 배포 확인용 `{ ok: true }` (인증 없음, 개인 데이터 없음) |
 | POST | /api/auth/otp | 코드 발송 (허용 이메일만, 응답 동일) |
 | POST | /api/auth/verify | 코드 검증 → access/refresh 토큰 + `has_profile` |
 | POST | /api/auth/refresh | 토큰 갱신 |

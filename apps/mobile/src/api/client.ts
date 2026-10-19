@@ -1,4 +1,12 @@
-import { ErrorResponseSchema, MeResponseSchema, type ErrorCode, type MeResponse } from '@kkilog/contracts';
+import {
+  ErrorResponseSchema,
+  MeResponseSchema,
+  OnboardingResponseSchema,
+  type ErrorCode,
+  type MeResponse,
+  type OnboardingRequest,
+  type OnboardingResponse,
+} from '@kkilog/contracts';
 import { clearStoredCode, getStoredCode } from './code-store';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -46,6 +54,18 @@ async function request(path: string, init?: RequestInit, candidateCode?: string)
   return res.json();
 }
 
+function postJson(path: string, body: unknown): Promise<unknown> {
+  return request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export async function getMe(candidateCode?: string): Promise<MeResponse> {
   return MeResponseSchema.parse(await request('/api/me', undefined, candidateCode));
+}
+
+export async function submitOnboarding(body: OnboardingRequest): Promise<OnboardingResponse> {
+  return OnboardingResponseSchema.parse(await postJson('/api/onboarding', body));
 }

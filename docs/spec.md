@@ -1,4 +1,4 @@
-# 식단 기록 앱 — 스펙 v0.4 (안드로이드 APK · Neon)
+# 식단 기록 앱 — 스펙 v0.5 (안드로이드 APK · Neon)
 
 ## 1. 목표와 전제
 - 음식 사진(+이름) 또는 텍스트 나열("삶은 계란 3개, 더단백 프로틴음료 1개")을 보내면 칼로리·탄단지를 추정해 **옮겨 적는 과정 없이** 저장한다.
@@ -27,10 +27,19 @@
 | 키 | cm | `profiles.height_cm` | 100.0~250.0 |
 | 현재 몸무게 | kg | 첫 `weight_logs` 행 | 20.0~300.0 |
 | 목표 몸무게 | kg | `profiles.target_weight_kg` | 20.0~300.0 |
+| 운동 정도 | 1~5 중 선택 | `profiles.activity_level` | 1~5 |
+| 목표 기간 | 몇 개월 안에 | `profiles.goal_months` | 1~24 |
+- 운동 정도 보기(사용자가 스스로 고른다)
+  1. 거의 안 움직임 — 앉아서 일하고 운동 안 함
+  2. 가벼움 — 주 1~2회 가벼운 운동
+  3. 보통 — 주 3~4회 운동
+  4. 활발 — 주 5~6회 운동
+  5. 매우 활발 — 매일 고강도 운동 또는 육체노동
 - 나이는 해가 바뀌면 달라지므로 출생연도로 바꿔 저장한다(±1세 오차는 감수).
-- 프로필 생성과 첫 체중 기록은 한 트랜잭션. 이미 프로필이 있으면 409.
-- 온보딩 직후 홈에 목표 칼로리가 바로 보여야 한다.
-- 프로필 수정 화면에서 같은 항목을 고칠 수 있다(몸무게는 제외 — 체중 기록으로 남김).
+- 하루 목표 칼로리는 온보딩 때 Gemini가 정한다(7절). 순서: Gemini 호출 → 성공하면 프로필·첫 체중·목표 칼로리를 한 트랜잭션으로 저장. Gemini가 실패하면 아무것도 저장하지 않고 재시도 가능한 오류를 돌려준다. 이미 프로필이 있으면 409.
+- 목표 기간은 목표 칼로리를 정하는 시점부터 센다.
+- 온보딩 직후 홈에 목표 칼로리가 바로 보여야 한다. 하한으로 조정됐다면(7.1) "기간 안에 도달하려면 하한보다 적게 먹어야 해서 하한으로 맞췄다"는 안내와 하한 기준 예상 도달 기간을 함께 보여준다.
+- 프로필 수정 화면에서 같은 항목을 고칠 수 있다(몸무게는 제외 — 체중 기록으로 남김). 목표 칼로리에 영향을 주는 항목(성별·나이·키·목표 몸무게·운동 정도·목표 기간)을 바꾸면 그 시점의 최근 체중으로 목표 칼로리를 다시 정한다. 이때 목표 기간은 그 시점부터 다시 센다.
 
 ### 2.3 홈 (대시보드)
 - 오늘 섭취 kcal / 목표 kcal, 탄·단·지 합계
@@ -67,7 +76,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - `apps/api/app/api/` — Route Handler
   - `apps/api/src/server/` — DB·Storage·Gemini 클라이언트, 인증 헬퍼 (`server-only`)
   - `apps/api/src/server/analysis/` — 프롬프트 로드, LLM 출력 스키마(zod), 응답 검증
-  - `apps/api/prompts/meal-analysis/v1.md` — 프롬프트 원문 (버전별 파일, 기존 파일 수정 금지)
+  - `apps/api/prompts/meal-analysis/v1.md`, `apps/api/prompts/calorie-target/v1.md` — 프롬프트 원문 (용도별·버전별 파일, 기존 파일 수정 금지)
   - `apps/api/scripts/allow-email.ts` — 허용 이메일 추가·삭제(운영자가 직접 실행)
   - `packages/domain/src/v1/` — 순수 함수 + `params.ts`
   - `packages/contracts/src/` — API zod 스키마
@@ -107,6 +116,8 @@ create table profiles (
   birth_year int not null check (birth_year between 1900 and 2100),  -- 나이 14~100은 API에서 검증
   height_cm numeric(4,1) not null check (height_cm between 100 and 250),
   target_weight_kg numeric(4,1) not null check (target_weight_kg between 20 and 300),
+  activity_level smallint not null check (activity_level between 1 and 5),
+  goal_months smallint not null check (goal_months between 1 and 24),
   timezone text not null default 'Asia/Seoul',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -155,6 +166,22 @@ create table meal_analyses (              -- 캐시. 재분석 시 행 추가
   created_at timestamptz not null default now()
 );
 create index on meal_analyses (entry_id, created_at desc);
+
+create table calorie_targets (            -- 목표 칼로리 이력. 덮어쓰지 않고 누적
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles,
+  kcal int not null,                      -- 최종값. 하한 미만이면 하한으로 맞춘 값
+  llm_kcal int not null,                  -- Gemini가 준 원래 값
+  maintenance_kcal int not null,          -- Gemini가 추정한 유지 칼로리
+  clamped boolean not null,               -- 하한으로 맞췄는지
+  reason text,                            -- Gemini가 준 근거 한두 줄
+  inputs jsonb not null,                  -- 계산에 쓴 성별·나이·키·체중·목표 체중·운동 정도·목표 기간
+  model_id text not null,
+  prompt_version text not null,
+  raw_response jsonb,
+  created_at timestamptz not null default now()
+);
+create index on calorie_targets (user_id, created_at desc);
 ```
 - 기록 테이블은 `profiles`를 참조한다 → 온보딩 전에는 기록이 생길 수 없다.
 - 사진 경로는 `meals/{user_id}/{entry_id}.jpg`. DB엔 pathname만 저장하고, 응답할 때마다 서명 URL을 새로 만든다.
@@ -163,7 +190,8 @@ create index on meal_analyses (entry_id, created_at desc);
 - `allowed_emails`는 `scripts/allow-email.ts`로만 관리한다.
 - 하루 체중값 = 그날 가장 마지막 기록. 목표 칼로리 계산엔 가장 최근 체중을 쓴다.
 - 나이 = 기준일 연도 − `birth_year` (계산은 `packages/domain`).
-- 운동 기록은 2차에 `activity_entries`(원본) + 분석 캐시 구조로 같은 패턴 추가. 활동계수는 1차에선 프로필에 받지 않고 `params.ts` 값(미확정)을 전원 공통으로 쓴다.
+- 현재 목표 칼로리 = 해당 사용자의 가장 최근 `calorie_targets` 행. 7일 평균 비교처럼 과거 날짜를 볼 땐 그날 기준으로 유효했던 행을 쓴다.
+- 운동 기록은 2차에 `activity_entries`(원본) + 분석 캐시 구조로 같은 패턴 추가.
 
 ## 6. 분석 파이프라인
 1. 입력: 사진(선택) + `input_text`(선택) + `correction_text`(재분석 시)
@@ -189,10 +217,24 @@ create index on meal_analyses (entry_id, created_at desc);
 - 429(무료 한도 초과)·타임아웃: 1회 재시도 후 `failed` 저장, 앱엔 [재시도]
 - 프롬프트·모델을 바꿔도 과거 기록은 소급 재분석하지 않는다. 새 `prompt_version`·`model_id`는 바뀐 뒤의 분석(신규 기록·[다시 분석])부터 적용되고, 과거 분석은 당시 버전 그대로 남는다.
 
-## 7. 체중 추세와 목표 칼로리 (v1, 값은 전부 미확정)
-- 입력: 성별, 나이, 키, 최근 체중, 목표 체중 (온보딩 항목만으로 계산 가능해야 함)
-- 추세: 일별 체중의 지수이동평균. 평활 계수 미확정
-- 목표 칼로리: BMR × 활동계수 − 일일 적자, 최저 하한 적용. 공식·계수·적자 폭·하한 미확정
+## 7. 목표 칼로리와 체중 추세
+### 7.1 목표 칼로리 (Gemini가 정하고 저장)
+- 정하는 시점: 온보딩, 그리고 프로필 수정에서 관련 항목이 바뀌었을 때. 매일 다시 계산하지 않는다(체중 기록만으로는 바뀌지 않음).
+- 입력: 성별, 나이, 키, 최근 체중, 목표 체중, 운동 정도(1~5), 목표 기간(개월)
+- Gemini 구조화 출력, temperature 0. 프롬프트는 `apps/api/prompts/calorie-target/v*.md`(끼니 분석과 별도 버전 관리)
+- LLM 출력 스키마
+  ```json
+  { "maintenance_kcal": 2400, "kcal": 1850, "reason": "유지 칼로리 약 2,400 − (10kg × 7,700 ÷ 140일) ≈ 1,850" }
+  ```
+- 기준: 목표 기간 안에 목표 체중에 도달하는 하루 섭취량. 유지 칼로리(BMR 공식·활동계수)는 Gemini가 판단하고, 적자·잉여는 체중 차이와 목표 기간으로 정한다(지방 1kg ≈ 7,700kcal). 증량 목표(목표 > 현재)도 같은 방식.
+- 서버 처리(`packages/domain`, 순수 함수): zod 검증 후
+  - `kcal` < 하한 1,200 → **하한 1,200으로 맞춰 저장**하고 `clamped = true`. 예상 도달 기간은 서버가 `체중 차이 × 7,700 ÷ (maintenance_kcal − 1,200)`로 다시 계산해 응답에 넣는다(`maintenance_kcal`이 하한 이하라 감량이 안 되는 경우엔 기간 없음).
+  - `kcal` > 상한 4,000 → Gemini 응답 이상으로 보고 실패 처리(저장 안 함, 재시도 가능)
+  - 하한·상한은 `params.ts`
+- 저장값은 `calorie_targets`에 `model_id`·`prompt_version`·입력값과 함께 남긴다. 프롬프트가 바뀌어도 기존 목표는 소급하지 않는다.
+
+### 7.2 체중 추세
+- 추세: 일별 체중의 지수이동평균(`packages/domain`). 평활 계수 α = 0.1(`params.ts`, 써 보면서 조정)
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
@@ -202,8 +244,8 @@ create index on meal_analyses (entry_id, created_at desc);
 | POST | /api/auth/otp | 코드 발송 (허용 이메일만, 응답 동일) |
 | POST | /api/auth/verify | 코드 검증 → access/refresh 토큰 + `has_profile` |
 | POST | /api/auth/refresh | 토큰 갱신 |
-| POST | /api/onboarding | 프로필 + 첫 체중. 이미 있으면 409 |
-| GET/PATCH | /api/profile | 프로필 조회·수정 |
+| POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리(하한 보정) → 한 트랜잭션 저장. 응답에 목표 칼로리·하한 보정 여부·예상 도달 기간. 이미 있으면 409, Gemini 실패 시 재시도 가능한 오류 |
+| GET/PATCH | /api/profile | 프로필 조회·수정. 목표 칼로리 관련 항목이 바뀌면 목표 칼로리를 다시 정해 함께 저장 |
 | GET | /api/home?date= | 해당일 섭취 합계·목표·끼니 목록(태그, 서명 사진 URL, 분석 상태)·체중 기록 여부 |
 | POST | /api/meals | multipart: meal_type, photo?, text?, client_request_id → 원본 저장 + 분석 → 결과. 중복이면 기존 결과 200 |
 | GET | /api/meals/:id | 상세 (현재 분석 + 사진 서명 URL) |
@@ -233,12 +275,12 @@ create index on meal_analyses (entry_id, created_at desc);
 | 0 | 모노레포 스캐폴드: pnpm 워크스페이스, apps/mobile(Expo), apps/api(Next.js), packages/domain·contracts, ESLint·Vitest·CI, 의존성 경계 테스트 |
 | 1 | `meallog` 스키마 마이그레이션(5절, FK 제외) + 마이그레이션 적용 스크립트 + Neon 클라이언트 |
 | 2 | 인증: 4절 선행 확인 결과 정리 → `user_id` 타입·FK 마이그레이션 추가 → OTP·검증·갱신 API, 허용 목록, Bearer 검증 헬퍼 / 앱 로그인 화면, SecureStore, fetch 래퍼 |
-| 3 | 온보딩: `POST /api/onboarding`(트랜잭션, 409) / 앱 온보딩 화면, 프로필 없으면 진입 강제 |
-| 4 | 분석 코어: LLM 출력 스키마, 프롬프트 v1, 정규화 순수 함수(합계·상한) + fixture 테스트, Gemini 클라이언트 |
+| 3 | 온보딩: Gemini 클라이언트, 목표 칼로리 프롬프트 v1·출력 스키마·범위 검증 + fixture 테스트, `POST /api/onboarding`(Gemini → 트랜잭션, 409) / 앱 온보딩 화면(운동 정도 1~5), 프로필 없으면 진입 강제 |
+| 4 | 분석 코어: 끼니 분석 LLM 출력 스키마, 프롬프트 v1, 정규화 순수 함수(합계·상한) + fixture 테스트 |
 | 5 | `POST /api/meals` + 재분석·상세·삭제: 끼니 태그, 사진 업로드, 멱등성(기존 결과 200), 실패 저장·재시도 |
 | 6 | 앱 기록하기 화면: 끼니 태그, 카메라·앨범, 사진 축소, 결과 카드, [다시 분석] |
-| 7 | 체중 기록 + 추세·목표 칼로리 순수 함수(v1) + 테스트, `/api/trend` |
-| 8 | 앱 홈·추세 화면(차트는 `react-native-svg`로 직접 그림), 프로필 수정 |
+| 7 | 체중 기록 + 추세 순수 함수(v1) + 테스트, `/api/trend` |
+| 8 | 앱 홈·추세 화면(차트는 `react-native-svg`로 직접 그림), 프로필 수정(목표 칼로리 재계산 포함) |
 | 9 | APK 빌드·서명·EAS Update(`expo-updates`) 설정, 설치 안내 |
 
 ## 12. 배포 후 확인 목록

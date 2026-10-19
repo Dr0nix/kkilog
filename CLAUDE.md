@@ -7,7 +7,7 @@
 pnpm 워크스페이스 모노레포
 - `apps/mobile` — Expo(React Native, TypeScript). 화면만 담당
 - `apps/api` — Next.js Route Handler만 사용하는 API 서버 (Vercel Hobby). 웹 화면 없음
-- `packages/domain` — 순수 함수(합계, 추세, 목표 칼로리). `apps/api`만 import
+- `packages/domain` — 순수 함수(합계, 추세, LLM 값 범위 검증). `apps/api`만 import
 - `packages/contracts` — API 요청·응답 zod 스키마와 타입. 양쪽에서 import
 
 ## 스택 (고정 — 새 의존성은 추가 전에 확인받을 것)
@@ -27,15 +27,14 @@ pnpm 워크스페이스 모노레포
 - 앱의 인증 토큰은 `expo-secure-store`에만 저장하고 `Authorization: Bearer` 헤더로 보낸다. URL에 토큰을 넣지 않는다.
 - 모든 쿼리는 토큰에서 꺼낸 `user_id`로 범위를 제한한다. 요청 body·query로 받은 user_id는 쓰지 않는다.
 - 없는 리소스와 남의 리소스는 둘 다 404.
-- 칼로리 합계·목표 칼로리·추세는 서버에서 `packages/domain`으로 계산한다. LLM이 준 합계, 앱이 보낸 계산값은 저장하지 않는다.
+- 칼로리 합계·추세는 서버에서 `packages/domain`으로 계산한다. LLM이 준 합계, 앱이 보낸 계산값은 저장하지 않는다.
+- 하루 목표 칼로리는 예외로 Gemini가 정한다(온보딩·프로필 수정 때만). 서버가 `packages/domain`에서 하한 미만이면 하한으로 맞추고(`clamped`), 상한 초과면 저장하지 않는다. Gemini 원래 값·`model_id`·`prompt_version`·입력값을 함께 저장한다.
 - 사진은 Vercel Blob private store에 저장하고, 앱엔 짧게 유효한 서명 URL로만 내려준다.
 - 개인 데이터 응답엔 `Cache-Control: private, no-store`.
 - 같은 `client_request_id`로 다시 온 기록 요청은 새로 만들지 않고 기존 리소스를 200으로 돌려준다.
 
 ## 아직 확정되지 않은 값 — 지어내지 말고 물어볼 것
-- 하루 필요 칼로리 산식(BMR 공식, 활동계수), 일일 적자 폭, 최저 섭취 하한
-- 체중 추세 평활 계수
-- `GEMINI_MODEL` 값, 프롬프트 문구
+- `GEMINI_MODEL` 값, 프롬프트 문구(끼니 분석·목표 칼로리)
 - Neon Auth 사용자 id 타입과 `neon_auth` 스키마의 사용자 테이블 이름 (PR 2 확인 전까지 FK를 걸지 않는다)
 - LLM 응답 정규화 상한값(kcal·탄단지), 사진 보관 기간
 불가피하게 임시값을 쓰면 `packages/domain/src/v1/params.ts` 한 곳에 모으고 `// TODO: 확정 필요 — 임시값`을 붙인다.
@@ -43,7 +42,7 @@ pnpm 워크스페이스 모노레포
 ## 승인이 필요한 변경
 - 테이블 스키마, 마이그레이션
 - API 요청·응답 형태(`packages/contracts`)
-- LLM 출력 스키마와 프롬프트(`apps/api/prompts/meal-analysis/v*.md`) — 바꾸면 `prompt_version`을 올린다. 기존 버전 파일은 수정하지 않는다.
+- LLM 출력 스키마와 프롬프트(`apps/api/prompts/*/v*.md`) — 바꾸면 `prompt_version`을 올린다. 기존 버전 파일은 수정하지 않는다.
 - 새 Expo 네이티브 모듈·config plugin (APK 재빌드가 필요해짐)
 - 화면 UI·스타일·컴포넌트 구조는 자유롭게 판단해도 된다.
 - 스펙과 다르게 구현했다면 같은 커밋에서 `docs/spec.md`도 고친다.

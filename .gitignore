@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.expo/
+.vercel/
+coverage/
+*.tsbuildinfo
+.env
+.env*.local
+.idea/

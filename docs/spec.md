@@ -221,7 +221,7 @@ create index on calorie_targets (user_id, created_at desc);
   { "kcal": 1850, "reason": "BMR 약 1,450 × 활동 1.375 − 감량 적자 약 150" }
   ```
 - 산식(BMR 공식, 활동계수, 적자·잉여 폭)은 프롬프트에서 Gemini가 판단한다. 증량 목표(목표 > 현재)도 Gemini가 판단한다.
-- 서버 검증: zod 검증 + `kcal`이 허용 범위 안인지 확인(범위는 `params.ts`, 미확정). 범위를 벗어나면 실패로 처리하고 저장하지 않는다(임의로 잘라서 저장하지 않음).
+- 서버 검증: zod 검증 + `kcal`이 허용 범위(1,200~4,000 kcal, `params.ts`) 안인지 확인. 범위를 벗어나면 실패로 처리하고 저장하지 않는다(임의로 잘라서 저장하지 않음).
 - 저장값은 `calorie_targets`에 `model_id`·`prompt_version`·입력값과 함께 남긴다. 프롬프트가 바뀌어도 기존 목표는 소급하지 않는다.
 
 ### 7.2 체중 추세

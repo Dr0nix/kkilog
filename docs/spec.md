@@ -63,12 +63,12 @@
 ```
 APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel)
                                 ├─ Neon Auth (이메일 OTP, 세션 검증)
-                                ├─ Neon Postgres — 기존 프로젝트, `meallog` 스키마 (user_id로 범위 제한)
+                                ├─ Neon Postgres — 기존 프로젝트, `kkilog` 스키마 (user_id로 범위 제한)
                                 ├─ Vercel Blob private store (사진)
                                 └─ Gemini API (구조화 출력)
 ```
 - DB 접근: `@neondatabase/serverless`(HTTP), ORM 없이 SQL. 여러 문장을 묶어야 하는 곳(온보딩)은 드라이버의 트랜잭션 API 사용.
-- 마이그레이션: `apps/api/migrations/NNNN_*.sql` 순번 파일 + 적용 스크립트(`pnpm --filter @kkilog/api migrate`는 미적용 목록만 표시, `--apply`를 붙여야 적용). 파일마다 한 트랜잭션. 적용 이력은 `meallog.schema_migrations`에 기록. 모든 객체 이름은 `meallog.`으로 한정해서 쓴다(`tests/migrations.test.ts`가 검사).
+- 마이그레이션: `apps/api/migrations/NNNN_*.sql` 순번 파일 + 적용 스크립트(`pnpm --filter @kkilog/api migrate`는 미적용 목록만 표시, `--apply`를 붙여야 적용). 파일마다 한 트랜잭션. 적용 이력은 `kkilog.schema_migrations`에 기록. 모든 객체 이름은 `kkilog.`으로 한정해서 쓴다(`tests/migrations.test.ts`가 검사).
 - 리뷰·검증용 DB는 Neon 브랜치로 만든다(운영 데이터 복제 없이 스키마만 적용해서 확인). CI는 DB에 접속하지 않는다.
 - 디렉터리
   - `apps/mobile/app/` — expo-router 화면 (`(auth)/`, `onboarding`, `(main)/`)
@@ -88,12 +88,12 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
 ## 4. 인증
 - Neon Auth(Managed Better Auth)의 이메일 OTP. 코드 메일은 Neon Auth 기본 발송을 쓴다(별도 메일 서비스·도메인 불필요). 사용자는 Neon이 같은 DB의 `neon_auth` 스키마에 저장한다.
 - 코드 요청·검증은 `apps/api`가 대신 처리하고, 앱엔 세션 토큰을 돌려준다. 앱은 Neon Auth를 직접 부르지 않는다.
-- 허용 목록: `apps/api`가 코드 요청 전에 `meallog.allowed_emails`를 확인한다. 없는 이메일도 응답은 동일하게(존재 여부 노출 금지).
+- 허용 목록: `apps/api`가 코드 요청 전에 `kkilog.allowed_emails`를 확인한다. 없는 이메일도 응답은 동일하게(존재 여부 노출 금지).
 - 서버는 모든 요청에서 Bearer 토큰을 검증해 `user_id`를 얻는다. 프로필이 필요한 API는 프로필이 없으면 `409 ONBOARDING_REQUIRED`.
 - **PR 2 선행 확인 항목** (확인 전엔 구현하지 않는다)
   - 서버가 앱 대신 OTP 발송·검증을 호출하고, 앱에 넘길 토큰을 받을 수 있는지(헤드리스 사용 가능 여부)
   - Bearer 토큰으로 서버에서 세션을 검증하는 방법, 만료·갱신 방식
-  - 사용자 id 타입과 사용자 테이블 위치 → `meallog` 테이블의 `user_id` 타입·FK 확정
+  - 사용자 id 타입과 사용자 테이블 위치 → `kkilog` 테이블의 `user_id` 타입·FK 확정
   - 세션 모델이 access/refresh 2토큰인지 단일 세션 토큰(만료 연장)인지 → `/api/auth/refresh` 계약 확정
   - 기본 메일 발송을 운영에서 써도 되는지(발송 한도·개발용 제한 여부)
   - Neon 브랜치(preview·로컬)에서 `neon_auth` 사용자 데이터가 어떻게 분리·복제되는지
@@ -101,11 +101,11 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
 
 ## 5. 데이터 모델 (초안 — 확정 시 마이그레이션)
 원본: `profiles`, `meal_entries`, `weight_logs` / 캐시: `meal_analyses`
-- 모든 테이블은 `meallog` 스키마. 기존 서비스의 스키마와 완전히 분리해 운영한다(서로 참조하지 않음, 같은 Neon 프로젝트의 저장 한도만 공유). 아래 `user_id`는 Neon Auth 사용자 id이며, 타입과 FK 대상은 PR 2 확인 후 확정한다(그 전까진 FK 없이 `not null`만).
+- 모든 테이블은 `kkilog` 스키마. 기존 서비스의 스키마와 완전히 분리해 운영한다(서로 참조하지 않음, 같은 Neon 프로젝트의 저장 한도만 공유). 아래 `user_id`는 Neon Auth 사용자 id이며, 타입과 FK 대상은 PR 2 확인 후 확정한다(그 전까진 FK 없이 `not null`만).
 
 ```sql
-create schema if not exists meallog;
-set search_path to meallog;
+create schema if not exists kkilog;
+set search_path to kkilog;
 
 create table allowed_emails (email text primary key check (email = lower(email)));
 
@@ -280,7 +280,7 @@ create index on calorie_targets (user_id, created_at desc);
 | PR | 내용 |
 | --- | --- |
 | 0 | 모노레포 스캐폴드: pnpm 워크스페이스, apps/mobile(Expo), apps/api(Next.js), packages/domain·contracts, ESLint·Vitest·CI, 의존성 경계 테스트 |
-| 1 | `meallog` 스키마 마이그레이션(5절, FK 제외) + 마이그레이션 적용 스크립트 + Neon 클라이언트 |
+| 1 | `kkilog` 스키마 마이그레이션(5절, FK 제외) + 마이그레이션 적용 스크립트 + Neon 클라이언트 |
 | 2 | 인증: 4절 선행 확인 결과 정리 → `user_id` 타입·FK 마이그레이션 추가 → OTP·검증·갱신 API, 허용 목록, Bearer 검증 헬퍼 / 앱 로그인 화면, SecureStore, fetch 래퍼 |
 | 3 | 온보딩: Gemini 클라이언트, 목표 칼로리 프롬프트 v1·출력 스키마·범위 검증 + fixture 테스트, `POST /api/onboarding`(Gemini → 트랜잭션, 409) / 앱 온보딩 화면(운동 정도 1~5), 프로필 없으면 진입 강제 |
 | 4 | 분석 코어: 끼니 분석 LLM 출력 스키마, 프롬프트 v1, 정규화 순수 함수(합계·상한) + fixture 테스트 |

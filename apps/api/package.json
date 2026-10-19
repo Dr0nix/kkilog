@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
-    "migrate": "node --env-file-if-exists=.env.local scripts/migrate.ts"
+    "migrate": "node --env-file-if-exists=.env.local scripts/migrate.ts",
+    "access-code": "node --env-file-if-exists=.env.local scripts/access-code.ts"
   },
   "dependencies": {
     "@kkilog/contracts": "workspace:*",

@@ -257,6 +257,8 @@ create index on calorie_targets (user_id, created_at desc);
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
+- 오류 응답은 `{ "error": { "code": "UNAUTHORIZED" | "ONBOARDING_REQUIRED" | "NOT_FOUND" | "INVALID_REQUEST" } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
+
 | Method | Path | 설명 |
 | --- | --- | --- |
 | GET | /api/health | 배포 확인용 `{ ok: true }` (인증 없음, 개인 데이터 없음) |

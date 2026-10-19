@@ -65,7 +65,14 @@ create table meallog.meal_analyses (
   notes text,
   raw_response jsonb,
   error text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- ok면 합산에 쓰는 값이 전부 있어야 하고(items는 JSON 배열), failed면 원인이 있어야 한다.
+  -- CHECK는 결과가 NULL이면 통과하므로 jsonb_typeof 앞에 items is not null을 둔다.
+  constraint meal_analyses_status_fields_chk check (
+    (status = 'ok' and items is not null and jsonb_typeof(items) = 'array' and kcal is not null and carb_g is not null
+      and protein_g is not null and fat_g is not null and error is null)
+    or (status = 'failed' and error is not null)
+  )
 );
 create index meal_analyses_entry_created_idx on meallog.meal_analyses (entry_id, created_at desc);
 

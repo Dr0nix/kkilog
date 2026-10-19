@@ -76,7 +76,8 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - `apps/mobile/src/api/` — fetch 래퍼(코드를 Bearer로 첨부, 401이면 저장된 코드 삭제 후 코드 입력 화면으로)
   - `apps/api/app/api/` — Route Handler
   - `apps/api/src/server/` — DB·Storage·Gemini 클라이언트, 인증 헬퍼 (`server-only`)
-  - `apps/api/src/server/analysis/` — 프롬프트 로드, LLM 출력 스키마(zod), 응답 검증
+  - `apps/api/src/llm/` — LLM 출력 스키마(zod)·JSON Schema 변환·응답 파싱, 재시도 판단 (`server-only` 없음 — 유닛 테스트 대상)
+  - `apps/api/src/server/{gemini,prompts,calorie-target,meal-analysis}.ts` — Gemini 호출, 프롬프트 로드, 분석 실행(`server-only`)
   - `apps/api/prompts/meal-analysis/v1.md`, `apps/api/prompts/calorie-target/v1.md` — 프롬프트 원문 (용도별·버전별 파일, 기존 파일 수정 금지)
   - `apps/api/scripts/access-code.ts` — 접속 코드 발급·폐기·조회(운영자가 직접 실행)
   - `packages/domain/src/v1/` — 순수 함수 + `params.ts`
@@ -228,10 +229,12 @@ create index on calorie_targets (user_id, created_at desc);
      "notes": "사진상 밥 양을 1공기로 가정"
    }
    ```
-4. 응답 검증(`apps/api/src/server/analysis/`, zod) — 실패 → `status='failed'`
+4. 응답 검증(`apps/api/src/llm/`, zod) — 실패 → `status='failed'`, `error='INVALID_OUTPUT'`
 5. 서버 정규화(`packages/domain`, 순수 함수 — 검증된 값만 받는다)
    - 합계는 item 합으로 서버가 계산 (LLM 합계 안 받음)
-   - 음수·비정상 값 차단 — 상한은 `params.ts`
+   - kcal은 정수, 탄단지는 소수 첫째 자리로 반올림. 합계는 반올림한 항목 값의 합
+   - 음수·NaN·상한(항목 수, 항목 kcal·탄단지, 끼니 합계 — `params.ts`) 초과가 하나라도 있으면 분석 전체를 `failed`(error에 사유)로 저장. 부분 저장 안 함
+   - 음식이 아니면 `items: []`, 합계 0으로 `ok` 저장
 6. `meal_analyses`에 `model_id`, `prompt_version` 채워서 저장
 - Gemini 호출 실패: 5xx·타임아웃(18초)은 바로, 429는 응답의 `retryDelay`만큼(최대 20초) 기다렸다가 1회 재시도한다. 그래도 실패하면 끼니 분석은 `failed` 저장 후 앱에 [재시도], 목표 칼로리는 저장 없이 `503 UPSTREAM_UNAVAILABLE`
 - 프롬프트·모델을 바꿔도 과거 기록은 소급 재분석하지 않는다. 새 `prompt_version`·`model_id`는 바뀐 뒤의 분석(신규 기록·[다시 분석])부터 적용되고, 과거 분석은 당시 버전 그대로 남는다.

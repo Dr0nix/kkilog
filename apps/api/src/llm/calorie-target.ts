@@ -1,5 +1,6 @@
 import { ACTIVITY_LEVELS, type Sex } from '@kkilog/contracts';
 import { z } from 'zod';
+import { jsonSchemaForGemini, parseJsonWith } from './json';
 
 // 프롬프트 파일: prompts/calorie-target/v1.md. 프롬프트·출력 스키마를 바꾸면 버전을 올린다(기존 파일 수정 금지).
 export const CALORIE_TARGET_PROMPT = { name: 'calorie-target', version: 'v1' } as const;
@@ -13,12 +14,7 @@ export const CalorieTargetOutputSchema = z.object({
 });
 export type CalorieTargetOutput = z.infer<typeof CalorieTargetOutputSchema>;
 
-// Gemini responseJsonSchema용. $schema 키는 받지 않으므로 뺀다.
-export const calorieTargetResponseJsonSchema: Record<string, unknown> = (() => {
-  const schema: Record<string, unknown> = { ...z.toJSONSchema(CalorieTargetOutputSchema) };
-  delete schema.$schema;
-  return schema;
-})();
+export const calorieTargetResponseJsonSchema = jsonSchemaForGemini(CalorieTargetOutputSchema);
 
 export type CalorieTargetLlmInput = {
   sex: Sex;
@@ -37,14 +33,6 @@ export function buildCalorieTargetInput(input: Omit<CalorieTargetLlmInput, 'acti
   return { ...input, activity_label: `${activity.label} — ${activity.description}` };
 }
 
-// JSON 파싱 + 스키마 검증. 실패하면 null.
 export function parseCalorieTargetOutput(text: string): CalorieTargetOutput | null {
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const parsed = CalorieTargetOutputSchema.safeParse(json);
-  return parsed.success ? parsed.data : null;
+  return parseJsonWith(CalorieTargetOutputSchema, text);
 }

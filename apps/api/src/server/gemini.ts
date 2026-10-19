@@ -33,18 +33,26 @@ export type GeminiJsonResult = {
   raw: { text: string; usage: unknown; model_version: string | undefined };
 };
 
+export type GeminiImage = { mimeType: string; base64: string };
+
 // 구조화 출력(JSON) 한 번 호출. 429·5xx·타임아웃은 1회만 재시도한다(spec 6).
+// input은 JSON 문자열로, images는 그 앞에 붙여 보낸다.
 export async function generateJson(args: {
   systemInstruction: string;
   input: unknown;
+  images?: readonly GeminiImage[];
   responseJsonSchema: unknown;
 }): Promise<GeminiJsonResult> {
   const model = geminiModel();
+  const parts = [
+    ...(args.images ?? []).map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.base64 } })),
+    { text: JSON.stringify(args.input) },
+  ];
   for (let attempt = 1; ; attempt++) {
     try {
       const response = await gemini().models.generateContent({
         model,
-        contents: [{ role: 'user', parts: [{ text: JSON.stringify(args.input) }] }],
+        contents: [{ role: 'user', parts }],
         config: {
           systemInstruction: args.systemInstruction,
           temperature: 0,

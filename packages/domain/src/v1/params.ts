@@ -7,3 +7,9 @@ export const CALORIE_TARGET_MAX_KCAL = 4000;
 
 // 체지방 1kg ≈ 7,700kcal (spec 7.1)
 export const KCAL_PER_KG = 7700;
+
+// 끼니 분석 정규화 상한(spec 6). 넘으면 비정상 응답으로 보고 분석을 failed로 저장한다.
+export const MEAL_MAX_ITEMS = 30; // TODO: 확정 필요 — 임시값
+export const MEAL_ITEM_MAX_KCAL = 3000; // TODO: 확정 필요 — 임시값
+export const MEAL_ITEM_MAX_MACRO_G = 300; // TODO: 확정 필요 — 임시값 (탄·단·지 각각)
+export const MEAL_MAX_KCAL = 6000; // TODO: 확정 필요 — 임시값 (끼니 합계)

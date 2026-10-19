@@ -233,7 +233,7 @@ create index on calorie_targets (user_id, created_at desc);
    - 합계는 item 합으로 서버가 계산 (LLM 합계 안 받음)
    - 음수·비정상 값 차단 — 상한은 `params.ts`
 6. `meal_analyses`에 `model_id`, `prompt_version` 채워서 저장
-- 429(무료 한도 초과)·타임아웃: 1회 재시도 후 `failed` 저장, 앱엔 [재시도]
+- Gemini 호출 실패: 5xx·타임아웃(18초)은 바로, 429는 응답의 `retryDelay`만큼(최대 20초) 기다렸다가 1회 재시도한다. 그래도 실패하면 끼니 분석은 `failed` 저장 후 앱에 [재시도], 목표 칼로리는 저장 없이 `503 UPSTREAM_UNAVAILABLE`
 - 프롬프트·모델을 바꿔도 과거 기록은 소급 재분석하지 않는다. 새 `prompt_version`·`model_id`는 바뀐 뒤의 분석(신규 기록·[다시 분석])부터 적용되고, 과거 분석은 당시 버전 그대로 남는다.
 
 ## 7. 목표 칼로리와 체중 추세
@@ -257,13 +257,13 @@ create index on calorie_targets (user_id, created_at desc);
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
-- 오류 응답은 `{ "error": { "code": "UNAUTHORIZED" | "ONBOARDING_REQUIRED" | "NOT_FOUND" | "INVALID_REQUEST" } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
+- 오류 응답은 `{ "error": { "code": ... } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 코드: `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `PROFILE_EXISTS`(409), `NOT_FOUND`(404), `INVALID_REQUEST`(400), `UPSTREAM_UNAVAILABLE`(503, Gemini 실패 — 잠시 후 재시도). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
 
 | Method | Path | 설명 |
 | --- | --- | --- |
 | GET | /api/health | 배포 확인용 `{ ok: true }` (인증 없음, 개인 데이터 없음) |
 | GET | /api/me | Bearer 코드 확인 → `has_profile`. 없거나 폐기된 코드면 401 |
-| POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리(하한 보정) → 한 트랜잭션 저장. 응답에 목표 칼로리·하한 보정 여부·예상 도달 기간. 이미 있으면 409, Gemini 실패 시 재시도 가능한 오류 |
+| POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리(하한 보정) → 한 트랜잭션 저장. 응답에 목표 칼로리·하한 보정 여부·예상 도달 기간. 이미 있으면 `409 PROFILE_EXISTS`(Gemini 호출 전에 확인), Gemini 실패·응답 이상·상한 초과면 `503 UPSTREAM_UNAVAILABLE` |
 | GET/PATCH | /api/profile | 프로필 조회·수정. 목표 칼로리 관련 항목이 바뀌면 목표 칼로리를 다시 정해 함께 저장 |
 | GET | /api/home?date= | 해당일 섭취 합계·목표·끼니 목록(태그, 서명 사진 URL, 분석 상태)·체중 기록 여부 |
 | POST | /api/meals | multipart: meal_type, photo?, text?, client_request_id → 원본 저장 + 분석 → 결과. 중복이면 기존 결과 200 |
@@ -282,7 +282,7 @@ create index on calorie_targets (user_id, created_at desc);
 - 사이드로딩 제약: 구글 개발자 인증 요구가 2027년 전 세계로 확대 예정. 그 전에 취미 개발자용 인증을 해두거나 ADB 설치로 대응.
 
 ## 10. 비용·한도·개인정보
-- 예상 호출: 4명 × 5회 ≈ 20회/일 + 재분석. Flash 계열 무료 한도 안. 한도는 AI Studio에서 확인(수시 변경)
+- 예상 호출: 4명 × 5회 ≈ 20회/일 + 재분석. 모델은 `gemini-3.8-flash`(2026-10 기준 무료 티어 **분당 5회**, 하루 한도는 AI Studio에서 확인 — 수시 변경). 동시에 여러 명이 기록하면 429가 날 수 있어 retryDelay 대기 후 1회 재시도로 흡수한다
 - Gemini 무료 티어는 입력·출력이 Google 모델 개선에 쓰일 수 있다 — 사용자(지인)에게 고지
 - Neon 무료: 프로젝트당 저장 0.5GB, 월 100 CU-시간, 5분 미사용 시 컴퓨트 정지(다음 요청 때 콜드 스타트). **저장 0.5GB를 넘으면 프로젝트가 정지**되므로 같은 프로젝트를 쓰는 다른 서비스와 용량을 같이 본다. 이 앱의 텍스트 데이터는 월 수 MB 수준이고, 가장 큰 건 `raw_response`
 - Vercel Blob: Hobby 무료 한도 내. 축소 사진 장당 ~200KB × 하루 20장 ≈ 월 120MB. 한도를 넘으면 Blob 접근이 막히므로, 사진 보관 기간(예: N일 후 삭제) 정책은 미확정 값으로 둔다

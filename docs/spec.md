@@ -68,7 +68,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
                                 └─ Gemini API (구조화 출력)
 ```
 - DB 접근: `@neondatabase/serverless`(HTTP), ORM 없이 SQL. 여러 문장을 묶어야 하는 곳(온보딩)은 드라이버의 트랜잭션 API 사용.
-- 마이그레이션: `apps/api/migrations/NNNN_*.sql` 순번 파일 + 적용 스크립트. 적용 이력은 `meallog.schema_migrations`에 기록.
+- 마이그레이션: `apps/api/migrations/NNNN_*.sql` 순번 파일 + 적용 스크립트(`pnpm --filter @kkilog/api migrate`는 미적용 목록만 표시, `--apply`를 붙여야 적용). 파일마다 한 트랜잭션. 적용 이력은 `meallog.schema_migrations`에 기록. 모든 객체 이름은 `meallog.`으로 한정해서 쓴다(`tests/migrations.test.ts`가 검사).
 - 리뷰·검증용 DB는 Neon 브랜치로 만든다(운영 데이터 복제 없이 스키마만 적용해서 확인). CI는 DB에 접속하지 않는다.
 - 디렉터리
   - `apps/mobile/app/` — expo-router 화면 (`(auth)/`, `onboarding`, `(main)/`)

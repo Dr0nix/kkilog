@@ -2,18 +2,22 @@
   "name": "@kkilog/api",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "migrate": "node --env-file-if-exists=.env.local scripts/migrate.ts"
   },
   "dependencies": {
     "@kkilog/contracts": "workspace:*",
     "@kkilog/domain": "workspace:*",
+    "@neondatabase/serverless": "^1.2.0",
     "next": "16.4.2",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",

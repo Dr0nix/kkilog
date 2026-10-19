@@ -65,10 +65,8 @@ describe('마이그레이션 파일', () => {
       expect(writeTargets(sql).filter((t) => !t.startsWith('kkilog.'))).toEqual([]);
     });
 
-    it('참조는 kkilog 또는 neon_auth(읽기 전용)만 한다', () => {
-      expect(
-        referenceTargets(sql).filter((t) => !t.startsWith('kkilog.') && !t.startsWith('neon_auth.')),
-      ).toEqual([]);
+    it('kkilog 안의 테이블만 참조한다', () => {
+      expect(referenceTargets(sql).filter((t) => !t.startsWith('kkilog.'))).toEqual([]);
     });
 
     it('search_path·스키마 생성/삭제에 의존하지 않는다', () => {

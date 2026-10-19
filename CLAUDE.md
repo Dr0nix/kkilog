@@ -7,7 +7,7 @@
 pnpm 워크스페이스 모노레포
 - `apps/mobile` — Expo(React Native, TypeScript). 화면만 담당
 - `apps/api` — Next.js Route Handler만 사용하는 API 서버 (Vercel Hobby). 웹 화면 없음
-- `packages/domain` — 순수 함수(합계, 추세, LLM 값 범위 검증). `apps/api`만 import
+- `packages/domain` — 순수 함수(합계, 추세, LLM 값 범위 검증·보정, 탄단지 그램 계산). `apps/api`만 import
 - `packages/contracts` — API 요청·응답 zod 스키마와 타입. 양쪽에서 import
 
 ## 스택 (고정 — 새 의존성은 추가 전에 확인받을 것)
@@ -28,7 +28,8 @@ pnpm 워크스페이스 모노레포
 - 모든 쿼리는 접속 코드로 찾은 `user_id`로 범위를 제한한다. 요청 body·query로 받은 user_id는 쓰지 않는다.
 - 없는 리소스와 남의 리소스는 둘 다 404.
 - 칼로리 합계·추세는 서버에서 `packages/domain`으로 계산한다. LLM이 준 합계, 앱이 보낸 계산값은 저장하지 않는다.
-- 하루 목표 칼로리는 예외로 Gemini가 정한다(온보딩·프로필 수정 때만). 서버가 `packages/domain`에서 하한 미만이면 하한으로 맞추고(`clamped`), 상한 초과면 저장하지 않는다. Gemini 원래 값·`model_id`·`prompt_version`·입력값을 함께 저장한다.
+- 끼니 분석 Gemini 호출에는 그 끼니의 입력(사진·텍스트·보정)만 넣는다. 오늘의 다른 끼니·목표·프로필 같은 맥락은 영양 조언 호출에만 넣는다(맥락이 추정치를 흔들지 않게).
+- 하루 목표 칼로리와 탄단지 비율은 예외로 Gemini가 정한다(온보딩·프로필 수정 때만). 탄단지 그램은 서버가 최종 kcal로 계산한다. 서버가 `packages/domain`에서 하한 미만이면 하한으로 맞추고(`clamped`), 상한 초과면 저장하지 않는다. Gemini 원래 값·`model_id`·`prompt_version`·입력값을 함께 저장한다.
 - 사진은 Vercel Blob private store에 저장하고, 앱엔 짧게 유효한 서명 URL로만 내려준다.
 - 개인 데이터 응답엔 `Cache-Control: private, no-store`.
 - 같은 `client_request_id`로 다시 온 기록 요청은 새로 만들지 않고 기존 리소스를 200으로 돌려준다.

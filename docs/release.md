@@ -13,10 +13,16 @@ APK 빌드와 OTA 업데이트 방법. 지인에게 보낼 설치 안내는 [ins
    - Expo에 `kkilog` 프로젝트를 만들고, `app.json`에 `extra.eas.projectId`와 `owner`를 써 넣는다.
 4. 업데이트 연결: `npx eas-cli@latest update:configure`
    - `app.json`의 `updates.url`을 채운다. `runtimeVersion`은 이미 `appVersion` 정책으로 잡혀 있다.
-5. 3·4에서 바뀐 `app.json`을 feature 브랜치 → `dev` PR로 커밋한다. 비밀 값이 아니다.
+5. 운영 API 주소를 EAS 환경변수로 등록한다. **첫 빌드 전에 반드시** 해야 한다(빌드와 OTA 모두 이 값을 쓴다. 없으면 앱의 모든 요청이 실패한다).
+   - `npx eas-cli@latest env:create --name EXPO_PUBLIC_API_BASE_URL --value https://api-rouge-kappa-59.vercel.app --environment production --visibility plaintext`
+   - 확인: `npx eas-cli@latest env:list --environment production`
+   - 공개 값이라 plaintext로 둔다(APK 안에 그대로 들어간다). 앱에는 이 변수 말고 다른 환경변수를 넣지 않는다.
+6. 3·4에서 바뀐 `app.json`을 feature 브랜치 → `dev` PR로 커밋한다. 비밀 값이 아니다.
+
+`apps/mobile/.env.local`은 로컬 개발(`expo start`)에서만 쓴다. EAS 빌드·업데이트는 EAS의 `production` 환경변수를 쓰고 이 파일을 보지 않는다.
 
 ## 첫 APK 빌드
-1. 운영 서버(`main`)가 앱 코드와 맞는 버전인지 확인한다. 빌드는 지금 브랜치의 앱 코드로 만들어지고, API는 운영 주소를 부른다.
+1. 운영 서버(`main`)가 앱 코드와 맞는 버전인지 확인한다. 빌드는 지금 브랜치의 앱 코드로 만들어지고, API는 EAS `production` 환경변수의 주소를 부른다.
 2. `npx eas-cli@latest build -p android --profile production`
    - 서명 키(keystore)를 만들지 물으면 **Yes**. 키는 EAS가 보관한다. **저장소에 넣지 않는다.**
    - 클라우드에서 10~20분 걸린다. 끝나면 APK 다운로드 링크(expo.dev)가 나온다.
@@ -32,10 +38,10 @@ APK 빌드와 OTA 업데이트 방법. 지인에게 보낼 설치 안내는 [ins
 
 ### OTA 업데이트 (JS만 바뀌었을 때)
 1. 바뀐 앱 코드가 `main`에 들어가 있고, 필요한 서버 변경도 운영에 배포돼 있어야 한다(앱이 운영 API를 부르므로).
-2. `main`을 받은 상태에서: `npx eas-cli@latest update --channel production --message "무엇을 바꿨는지"`
-   - 이 컴퓨터의 `apps/mobile/.env.local`(`EXPO_PUBLIC_API_BASE_URL`)로 번들이 만들어진다. 운영 주소인지 확인한다.
+2. `main`을 받은 상태에서: `npx eas-cli@latest update --channel production --environment production --message "무엇을 바꿨는지"`
+   - EAS의 `production` 환경변수로 번들이 만들어진다(로컬 `.env`는 쓰지 않음). SDK 55 이상에선 `--environment`가 필수다.
 3. 사용자는 앱을 완전히 껐다 켜면 받는다. 시작할 때 확인하고 내려받아 다음 실행부터 적용된다.
-4. 잘못 올렸으면 `npx eas-cli@latest update:republish`로 이전 업데이트를 다시 올리거나, 고친 코드로 새 업데이트를 올린다.
+4. 잘못 올렸으면 `npx eas-cli@latest update:republish`로 이전 업데이트를 다시 올리거나(이미 만든 번들을 다시 올리는 것이라 `--environment`가 없다), 고친 코드로 2번처럼 새 업데이트를 올린다.
 
 ### APK 다시 빌드 (네이티브가 바뀌었을 때)
 1. `app.json`의 `version`을 올리고(예: `1.0.0` → `1.1.0`) `android.versionCode`를 1 올린다.

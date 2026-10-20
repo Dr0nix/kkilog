@@ -338,8 +338,8 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
   - 환경변수(`DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `BLOB_READ_WRITE_TOKEN`)는 Vercel 프로젝트 설정에 둔다. DB·Blob이 하나라 Production·Preview 값이 같다
 - DB: 운영·preview·로컬 모두 기존 Neon 프로젝트의 기본 브랜치 하나. 같은 `DATABASE_URL`을 쓴다
 - Vercel Blob: private store 하나를 운영·preview·로컬이 같이 쓴다(DB와 같은 이유). Hobby 플랜에서 private 업로드·서명 URL(`issueSignedToken` + `presignUrl`, `@vercel/blob` 2.8) 동작 확인함(2026-10-20): 서명 없는 URL·경로 바꾼 URL·만료된 URL은 403
-- APK: EAS Build(무료 플랜 월 빌드 횟수 제한), `apps/mobile/eas.json`의 `production` 프로필(APK, 채널 `production`, 운영 API 주소). 앱 ID `dev.kkilog.app`. 서명 키는 EAS가 보관하고 운영자가 저장소 밖에 백업한다(저장소에 넣지 않음). 절차는 `docs/release.md`, 지인용 설치 안내는 `docs/install.md`
-- JS만 바뀐 수정은 EAS Update(OTA, 채널 `production`)로 배포해 재설치 없이 반영. 앱은 시작할 때 확인해 다음 실행부터 적용한다. 네이티브(모듈·권한·`app.json` 네이티브 설정)가 바뀌면 `version`·`versionCode`를 올려 APK 재배포(`runtimeVersion`이 `version`을 따라 예전 APK엔 새 OTA가 가지 않음)
+- APK: EAS Build(무료 플랜 월 빌드 횟수 제한), `apps/mobile/eas.json`의 `production` 프로필(APK, 채널 `production`, EAS 환경변수 `production`의 `EXPO_PUBLIC_API_BASE_URL`). 앱 ID `dev.kkilog.app`. 서명 키는 EAS가 보관하고 운영자가 저장소 밖에 백업한다(저장소에 넣지 않음). 절차는 `docs/release.md`, 지인용 설치 안내는 `docs/install.md`
+- JS만 바뀐 수정은 EAS Update(OTA, 채널 `production`, `--environment production` — 빌드와 같은 EAS 환경변수를 쓴다)로 배포해 재설치 없이 반영. 앱은 시작할 때 확인해 다음 실행부터 적용한다. 네이티브(모듈·권한·`app.json` 네이티브 설정)가 바뀌면 `version`·`versionCode`를 올려 APK 재배포(`runtimeVersion`이 `version`을 따라 예전 APK엔 새 OTA가 가지 않음)
 - Expo 계정은 운영자만 필요하다. 사용자는 APK 설치와 접속 코드만 있으면 된다
 - 사이드로딩 제약: 구글 개발자 인증 요구가 2027년 전 세계로 확대 예정. 그 전에 취미 개발자용 인증을 해두거나 ADB 설치로 대응.
 

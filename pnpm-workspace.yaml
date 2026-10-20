@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# 설치 스크립트는 기본 차단. 확인한 패키지만 명시한다.
+allowBuilds:
+  '@google/genai': false # preinstall이 echo만 하는 no-op
+  protobufjs: false # postinstall은 버전 표기 경고만 출력

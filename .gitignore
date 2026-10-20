@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.expo/
+.vercel/
+coverage/
+*.tsbuildinfo
+.env
+.env*.local
+.idea/
+next-env.d.ts
+# next dev가 AI 에이전트 실행 시 자동 생성. 프로젝트 규칙은 CLAUDE.md에 둔다
+apps/api/AGENTS.md

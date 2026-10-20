@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageOn, birthYearFromAge, daysUntilMonthsLater, localDate } from './dates';
+import { ageOn, birthYearFromAge, daysUntilMonthsLater, localDate, localTime } from './dates';
 
 describe('localDate', () => {
   it('타임존 기준 날짜를 쓴다', () => {
@@ -31,5 +31,12 @@ describe('daysUntilMonthsLater', () => {
   it('그 달에 같은 날이 없으면 말일로 맞춘다', () => {
     expect(daysUntilMonthsLater('2026-01-31', 1)).toBe(28); // 2026-02-28
     expect(daysUntilMonthsLater('2028-01-31', 1)).toBe(29); // 윤년 2028-02-29
+  });
+});
+
+describe('localTime', () => {
+  it('타임존 기준 24시간 HH:mm', () => {
+    expect(localTime(new Date('2026-10-20T03:05:00Z'), 'Asia/Seoul')).toBe('12:05');
+    expect(localTime(new Date('2026-10-20T15:30:00Z'), 'Asia/Seoul')).toBe('00:30');
   });
 });

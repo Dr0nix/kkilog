@@ -2,10 +2,12 @@ import {
   type AnalyzeMealRequest,
   CREATE_MEAL_FIELDS,
   ErrorResponseSchema,
+  MealAdviceResponseSchema,
   MealMutationResponseSchema,
   MeResponseSchema,
   OnboardingResponseSchema,
   type ErrorCode,
+  type MealAdviceResponse,
   type MealMutationResponse,
   type MealType,
   type MeResponse,
@@ -97,4 +99,9 @@ export async function createMeal(meal: NewMeal): Promise<MealMutationResponse> {
 
 export async function analyzeMeal(mealId: string, body: AnalyzeMealRequest = {}): Promise<MealMutationResponse> {
   return MealMutationResponseSchema.parse(await postJson(`/api/meals/${mealId}/analyze`, body));
+}
+
+// 현재 분석 기준 영양 조언. 이미 있으면 서버가 저장된 것을 돌려준다(spec 6.2).
+export async function getMealAdvice(mealId: string): Promise<MealAdviceResponse> {
+  return MealAdviceResponseSchema.parse(await request(`/api/meals/${mealId}/advice`, { method: 'POST' }));
 }

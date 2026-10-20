@@ -2,4 +2,5 @@
 export * from './access-code';
 export * from './errors';
 export * from './me';
+export * from './meals';
 export * from './onboarding';

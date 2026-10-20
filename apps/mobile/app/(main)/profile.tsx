@@ -16,11 +16,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { ApiError, getProfile, updateProfile } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
+import { TextField } from '../../src/components/TextField';
 import { formatKg } from '../../src/format';
 import { type Form, type NumberField, changes, toForm } from '../../src/profile-form';
 
@@ -140,7 +140,7 @@ export default function ProfileScreen() {
       {profile && form ? (
         <>
           <Text style={styles.label}>닉네임</Text>
-          <TextInput style={styles.input} value={form.nickname} onChangeText={(nickname) => update({ nickname })} maxLength={20} />
+          <TextField style={styles.input} value={form.nickname} onChangeText={(nickname) => update({ nickname })} maxLength={20} />
 
           <Text style={styles.label}>성별</Text>
           <View style={styles.row}>
@@ -160,7 +160,7 @@ export default function ProfileScreen() {
           {NUMBER_FIELDS.map(({ key, label, keyboard }) => (
             <View key={key}>
               <Text style={styles.label}>{label}</Text>
-              <TextInput
+              <TextField
                 style={styles.input}
                 value={form[key]}
                 onChangeText={(text) => update({ [key]: text })}

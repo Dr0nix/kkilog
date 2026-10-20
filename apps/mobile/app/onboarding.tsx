@@ -14,10 +14,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { ApiError, UnauthorizedError, submitOnboarding } from '../src/api/client';
+import { TextField } from '../src/components/TextField';
 
 type NumberField = 'age' | 'height_cm' | 'weight_kg' | 'target_weight_kg' | 'goal_months';
 
@@ -113,7 +113,7 @@ export default function OnboardingScreen() {
       <Text style={styles.title}>처음 한 번만 입력해 주세요</Text>
 
       <Text style={styles.label}>닉네임</Text>
-      <TextInput style={styles.input} value={nickname} onChangeText={setNickname} maxLength={20} editable={!submitting} />
+      <TextField style={styles.input} value={nickname} onChangeText={setNickname} maxLength={20} editable={!submitting} />
 
       <Text style={styles.label}>성별</Text>
       <View style={styles.row}>
@@ -137,7 +137,7 @@ export default function OnboardingScreen() {
       {NUMBER_FIELDS.map((field) => (
         <View key={field.key}>
           <Text style={styles.label}>{field.label}</Text>
-          <TextInput
+          <TextField
             style={styles.input}
             value={numbers[field.key]}
             onChangeText={(text) => setNumbers((prev) => ({ ...prev, [field.key]: text }))}

@@ -1,10 +1,11 @@
 import { CORRECTION_TEXT_MAX_LENGTH, type Meal } from '@kkilog/contracts';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { UnauthorizedError, analyzeMeal, getMealAdvice } from '../api/client';
 import { NETWORK_ERROR, shouldShowError } from '../api/errors';
 import { type AdviceView, MealAdviceCard } from './MealAdviceCard';
 import { MealResultCard } from './MealResultCard';
+import { TextField } from './TextField';
 
 // 결과 카드 + 영양 조언 + [다시 분석]/[재시도](spec 2.4). 기록 화면과 끼니 상세 화면이 같이 쓴다.
 export function MealResultSection({
@@ -98,7 +99,7 @@ export function MealResultSection({
       ) : (
         <View style={styles.correction}>
           <Text style={styles.label}>결과가 틀렸나요? 한 줄로 알려 주세요</Text>
-          <TextInput
+          <TextField
             style={styles.input}
             value={correction}
             onChangeText={setCorrection}

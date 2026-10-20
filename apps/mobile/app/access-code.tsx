@@ -1,9 +1,10 @@
 import { normalizeAccessCode } from '@kkilog/contracts';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { UnauthorizedError, getMe } from '../src/api/client';
 import { storeCode } from '../src/api/code-store';
+import { TextField } from '../src/components/TextField';
 
 export default function AccessCodeScreen() {
   const [input, setInput] = useState('');
@@ -33,7 +34,7 @@ export default function AccessCodeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>접속 코드</Text>
       <Text style={styles.help}>받은 코드를 입력하거나 붙여 넣으세요. 처음 한 번만 입력하면 됩니다.</Text>
-      <TextInput
+      <TextField
         style={styles.input}
         value={input}
         onChangeText={setInput}

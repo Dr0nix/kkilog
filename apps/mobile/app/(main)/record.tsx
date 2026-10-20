@@ -1,10 +1,11 @@
 import { MEAL_TEXT_MAX_LENGTH, MEAL_TYPE_LABELS, MEAL_TYPES, type Meal, type MealType } from '@kkilog/contracts';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { createMeal } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
 import { MealResultSection } from '../../src/components/MealResultSection';
+import { TextField } from '../../src/components/TextField';
 import { defaultMealType } from '../../src/meal-type';
 import { type PickedPhoto, openAppSettings, pickPhoto } from '../../src/photo';
 import { newRequestId } from '../../src/request-id';
@@ -118,7 +119,7 @@ export default function RecordScreen() {
             </Pressable>
           ) : null}
 
-          <TextInput
+          <TextField
             style={[styles.input, styles.multiline]}
             value={text}
             onChangeText={setText}

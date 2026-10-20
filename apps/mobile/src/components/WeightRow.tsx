@@ -1,10 +1,11 @@
 import { CreateWeightRequestSchema, type HomeResponse } from '@kkilog/contracts';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { createWeight } from '../api/client';
 import { NETWORK_ERROR, shouldShowError } from '../api/errors';
 import { formatKg } from '../format';
 import { newRequestId } from '../request-id';
+import { TextField } from './TextField';
 
 // 체중: 오늘 기록 여부 + [체중 기록](spec 2.3). 체중 API는 오늘 날짜로만 쌓으므로 오늘 화면에서만 기록할 수 있다.
 export function WeightRow({
@@ -71,7 +72,7 @@ export function WeightRow({
 
       {editing ? (
         <View style={styles.row}>
-          <TextInput
+          <TextField
             style={[styles.input, styles.flex]}
             value={text}
             onChangeText={setText}

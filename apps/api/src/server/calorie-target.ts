@@ -1,4 +1,6 @@
 import 'server-only';
+import type { CalorieTarget } from '@kkilog/contracts';
+import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { finalizeCalorieTarget, finalizeMacroTarget } from '@kkilog/domain';
 import {
   CALORIE_TARGET_PROMPT,
@@ -74,5 +76,36 @@ export async function decideCalorieTarget(inputs: CalorieTargetLlmInput): Promis
     modelId: result.model,
     promptVersion: CALORIE_TARGET_PROMPT_VERSION,
     raw: result.raw,
+  };
+}
+
+// calorie_targets 한 행. 온보딩·프로필 수정 트랜잭션 안에서 쓴다.
+export function insertCalorieTarget(sql: NeonQueryFunction<false, false>, userId: string, target: DecidedCalorieTarget) {
+  return sql`
+    insert into kkilog.calorie_targets
+      (user_id, kcal, llm_kcal, maintenance_kcal, clamped, carb_pct, protein_pct, fat_pct, carb_g, protein_g, fat_g,
+       reason, inputs, model_id, prompt_version, raw_response)
+    values
+      (${userId}, ${target.kcal}, ${target.llmKcal}, ${target.maintenanceKcal}, ${target.clamped},
+       ${target.macros.carbPct}, ${target.macros.proteinPct}, ${target.macros.fatPct},
+       ${target.macros.carbG}, ${target.macros.proteinG}, ${target.macros.fatG}, ${target.reason},
+       ${JSON.stringify(target.inputs)}::jsonb, ${target.modelId}, ${target.promptVersion},
+       ${JSON.stringify(target.raw)}::jsonb)`;
+}
+
+export function toCalorieTargetResponse(target: DecidedCalorieTarget): CalorieTarget {
+  return {
+    kcal: target.kcal,
+    clamped: target.clamped,
+    expected_days: target.expectedDays,
+    macros: {
+      carb_pct: target.macros.carbPct,
+      protein_pct: target.macros.proteinPct,
+      fat_pct: target.macros.fatPct,
+      carb_g: target.macros.carbG,
+      protein_g: target.macros.proteinG,
+      fat_g: target.macros.fatG,
+    },
+    reason: target.reason,
   };
 }

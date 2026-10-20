@@ -298,6 +298,10 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 
 ### 7.2 체중 추세
 - 추세: 일별 체중의 지수이동평균(`packages/domain`). 평활 계수 α = 0.1(`params.ts`, 써 보면서 조정)
+  - 하루 체중값 = 그날 마지막 기록. 첫 추세값 = 첫 체중. 기록이 있는 날만 `trend += α × (체중 − trend)`, 기록이 없는 날은 전날 추세를 그대로 잇는다
+  - 기울기(kg/주) = 최근 14일 추세 변화 × 7 ÷ 14. 기록 기간이 14일보다 짧으면 있는 만큼으로, 7일보다 짧으면 없음(임시값)
+  - 목표까지 남은 kg = 오늘 추세 − 목표 체중. 감량·증량 방향은 첫 체중과 목표로 정한다. 목표 쪽으로 가고 있으면 도달 예상일 = 오늘 + 남은 kg ÷ 하루 변화량(730일 넘으면 없음, 임시값)
+  - 7일 평균 섭취 = 오늘을 뺀 최근 7일 중 끼니를 기록한 날의 하루 합계 평균(기록 없는 날은 0kcal로 보지 않고 뺀다). 비교 목표는 그 날들에 유효했던 목표 kcal의 평균
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
@@ -315,8 +319,8 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |
 | POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2) → `{ advice: { text, analysis_created_at, created_at } }`. 현재 ok 분석이 없으면 `409 ANALYSIS_REQUIRED`, Gemini 실패·응답 이상이면 `503 UPSTREAM_UNAVAILABLE`(저장 안 함) |
 | DELETE | /api/meals/:id | soft delete → 204. 지운 끼니는 없는 것으로 본다(이후 조회·재분석·삭제 404). 사진은 보관 기간 정책이 정해질 때까지 남긴다 |
-| POST | /api/weights | weight_kg, client_request_id. 중복이면 기존 기록 200 |
-| GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취 |
+| POST | /api/weights | `{ weight_kg, client_request_id }` → `{ weight }`. 오늘(프로필 타임존) 날짜로 쌓는다. 중복이면 기존 기록 200. 프로필 없으면 `409 ONBOARDING_REQUIRED` |
+| GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취(7.2). `days`는 그래프 기간 7~365, 기본 30. 추세는 전체 기록으로 계산하고 그 기간만 잘라 보낸다 |
 
 ## 9. 빌드·배포
 - API: Vercel 프로젝트(운영자의 기존 Vercel 계정에 별도 프로젝트, Root Directory `apps/api`). 운영 주소 `https://api-rouge-kappa-59.vercel.app`

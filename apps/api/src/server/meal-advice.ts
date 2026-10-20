@@ -1,8 +1,16 @@
 import 'server-only';
 import type { MealAdvice } from '@kkilog/contracts';
-import type { DailyTarget, MealItemInput } from '@kkilog/domain';
+import {
+  type DailyTarget,
+  INTAKE_AVERAGE_DAYS,
+  type MealItemInput,
+  type RecentSummary,
+  addDays,
+  summarizeRecentDays,
+} from '@kkilog/domain';
 import {
   type AdviceMealSource,
+  type AdviceWeight,
   MEAL_ADVICE_PROMPT,
   MEAL_ADVICE_PROMPT_VERSION,
   buildMealAdviceInput,
@@ -12,8 +20,9 @@ import {
 import { type MealEntryRow, toIso } from '../meals/view';
 import { db } from './db';
 import { GeminiError, generateJson } from './gemini';
-import { profileTimezone } from './meals';
 import { loadPrompt } from './prompts';
+import { targetsOn } from './targets';
+import { recentMeals, weightProgress } from './trend';
 
 type Numeric = string | number;
 
@@ -83,11 +92,41 @@ async function currentTarget(userId: string): Promise<DailyTarget> {
   };
 }
 
+// 장기 맥락(spec 6.2, v2): 이 끼니 날짜 전날까지 최근 며칠의 요약과 체중 추세. 숫자·패턴은 전부 서버가 계산한다.
+async function longContext(
+  userId: string,
+  date: string,
+): Promise<{ recent: RecentSummary; weight: AdviceWeight | null; timeZone: string }> {
+  const rows = await db()`select timezone, target_weight_kg from kkilog.profiles where user_id = ${userId}`;
+  const profile = rows[0];
+  if (!profile) throw new Error('profile not found');
+  const timeZone = profile.timezone as string;
+  const targetWeightKg = Number(profile.target_weight_kg);
+
+  const meals = await recentMeals(userId, addDays(date, -INTAKE_AVERAGE_DAYS), addDays(date, -1));
+  const [targets, progress] = await Promise.all([
+    targetsOn(userId, [...new Set(meals.map((m) => m.date))], timeZone),
+    weightProgress(userId, date, targetWeightKg),
+  ]);
+  const weight =
+    progress.trendKg !== null && progress.progress
+      ? {
+          trend_kg: progress.trendKg,
+          target_weight_kg: targetWeightKg,
+          remaining_kg: progress.progress.remainingKg,
+          slope_kg_per_week: progress.slope,
+          goal_status: progress.progress.status,
+          eta_date: progress.progress.status === 'on_track' ? progress.progress.etaDate : null,
+        }
+      : null;
+  return { recent: summarizeRecentDays(meals, targets, INTAKE_AVERAGE_DAYS), weight, timeZone };
+}
+
 export type AdviceOutcome = { status: 'ok'; advice: MealAdvice } | { status: 'no_analysis' };
 
 // 현재 분석 기준 영양 조언(spec 6.2). 저장된 게 있으면 Gemini를 부르지 않는다.
 // Gemini 실패·응답 이상은 GeminiError로 던지고 저장하지 않는다(호출 측이 503).
-// 맥락(오늘 다른 끼니·목표)은 이 호출에만 넣는다(CLAUDE.md).
+// 맥락(오늘 다른 끼니·목표·최근 기록·체중 추세)은 이 호출에만 넣는다(CLAUDE.md).
 export async function getOrCreateAdvice(userId: string, entry: MealEntryRow): Promise<AdviceOutcome> {
   const analysis = await currentOkAnalysis(entry.id);
   if (!analysis) return { status: 'no_analysis' };
@@ -100,10 +139,10 @@ export async function getOrCreateAdvice(userId: string, entry: MealEntryRow): Pr
   const saved = await savedAdvice(analysis.id);
   if (saved) return toAdvice(saved);
 
-  const [earlier, target, timeZone] = await Promise.all([
+  const [earlier, target, context] = await Promise.all([
     earlierMeals(userId, entry),
     currentTarget(userId),
-    profileTimezone(userId),
+    longContext(userId, entry.local_date),
   ]);
   const input = buildMealAdviceInput({
     thisMeal: {
@@ -114,7 +153,9 @@ export async function getOrCreateAdvice(userId: string, entry: MealEntryRow): Pr
     },
     earlierMeals: earlier,
     target,
-    timeZone: timeZone ?? 'Asia/Seoul',
+    timeZone: context.timeZone,
+    recent: context.recent,
+    weight: context.weight,
   });
 
   const result = await generateJson({

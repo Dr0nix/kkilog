@@ -5,3 +5,4 @@ export * from './v1/meal';
 export * from './v1/macro-target';
 export * from './v1/daily-target';
 export * from './v1/trend';
+export * from './v1/recent';

@@ -41,12 +41,15 @@ async function findAnalyses(entryId: string): Promise<MealAnalysisRow[]> {
   return rows as MealAnalysisRow[];
 }
 
+// 사진 pathname을 순서대로. 목록은 meal_photos가 기준이다(0005, 예전 사진도 0번으로 옮겨 둠).
+async function findPhotoPaths(entryId: string): Promise<string[]> {
+  const rows = await db()`select path from kkilog.meal_photos where entry_id = ${entryId} order by position`;
+  return rows.map((row) => row.path as string);
+}
+
 export async function toMealResponse(entry: MealEntryRow): Promise<Meal> {
-  const [analyses, photoUrl] = await Promise.all([
-    findAnalyses(entry.id),
-    entry.photo_path ? signedPhotoUrl(entry.photo_path) : Promise.resolve(null),
-  ]);
-  return toMeal(entry, analyses, photoUrl);
+  const [analyses, paths] = await Promise.all([findAnalyses(entry.id), findPhotoPaths(entry.id)]);
+  return toMeal(entry, analyses, await Promise.all(paths.map(signedPhotoUrl)));
 }
 
 export async function latestCorrectionText(entryId: string): Promise<string | null> {
@@ -75,17 +78,17 @@ async function saveAnalysis(entryId: string, result: MealAnalysisResult): Promis
 }
 
 // 원본(텍스트·사진)으로 분석하고 결과를 행으로 남긴다. 실패도 저장해 [재시도]할 수 있게 한다(spec 3).
-// 분석 호출엔 이 끼니의 입력만 넣는다(CLAUDE.md).
+// 분석 호출엔 이 끼니의 입력만 넣는다(CLAUDE.md). photosBase64가 없으면(재분석) Blob에서 다시 읽는다.
 export async function analyzeAndSave(
   entry: MealEntryRow,
   correctionText: string | null,
-  photoBase64?: string,
+  photosBase64?: readonly string[],
 ): Promise<MealAnalysisResult> {
-  const base64 = photoBase64 ?? (entry.photo_path ? await readPhotoBase64(entry.photo_path) : null);
+  const base64s = photosBase64 ?? (await Promise.all((await findPhotoPaths(entry.id)).map(readPhotoBase64)));
   const result = await analyzeMeal({
     inputText: entry.input_text,
     correctionText,
-    image: base64 ? { mimeType: 'image/jpeg', base64 } : null,
+    images: base64s.map((base64) => ({ mimeType: 'image/jpeg', base64 })),
   });
   await saveAnalysis(entry.id, result);
   return result;

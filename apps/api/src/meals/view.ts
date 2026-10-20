@@ -7,6 +7,7 @@ export type MealEntryRow = {
   local_date: string; // SQL에서 ::text로 읽는다(Date로 바뀌며 타임존이 섞이지 않게)
   eaten_at: Date | string;
   input_text: string | null;
+  // 대표(첫) 사진. 사진 목록은 meal_photos가 기준이다(0005)
   photo_path: string | null;
 };
 
@@ -54,7 +55,8 @@ export function pickCurrentAnalysis(analyses: readonly MealAnalysisRow[]): MealA
   return analyses.find((a) => a.status === 'ok') ?? analyses[0] ?? null;
 }
 
-export function toMeal(entry: MealEntryRow, analyses: readonly MealAnalysisRow[], photoUrl: string | null): Meal {
+// photoUrls는 사진 순서대로 서명한 URL.
+export function toMeal(entry: MealEntryRow, analyses: readonly MealAnalysisRow[], photoUrls: readonly string[]): Meal {
   const current = pickCurrentAnalysis(analyses);
   return {
     id: entry.id,
@@ -62,7 +64,8 @@ export function toMeal(entry: MealEntryRow, analyses: readonly MealAnalysisRow[]
     local_date: entry.local_date,
     eaten_at: toIso(entry.eaten_at),
     input_text: entry.input_text,
-    photo_url: photoUrl,
+    photo_urls: [...photoUrls],
+    photo_url: photoUrls[0] ?? null,
     analysis: current ? toMealAnalysis(current) : null,
   };
 }

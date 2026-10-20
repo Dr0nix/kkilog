@@ -4,9 +4,10 @@ import { del, get, issueSignedToken, presignUrl, put } from '@vercel/blob';
 // 앱에 내려주는 사진 서명 URL의 유효 시간(spec 5 "짧게 유효한 서명 URL").
 const SIGNED_URL_TTL_MS = 10 * 60 * 1000;
 
-// DB엔 pathname만 저장한다(URL 아님, spec 5).
-export function mealPhotoPathname(userId: string, entryId: string): string {
-  return `meals/${userId}/${entryId}.jpg`;
+// DB엔 pathname만 저장한다(URL 아님, spec 5). position은 사진 순서(0이 대표).
+// 0005 전에 올린 사진은 meals/{user_id}/{entry_id}.jpg로 남아 있다(DB에 경로가 그대로 있어 문제없음).
+export function mealPhotoPathname(userId: string, entryId: string, position: number): string {
+  return `meals/${userId}/${entryId}-${position}.jpg`;
 }
 
 export async function uploadMealPhoto(pathname: string, photo: Blob): Promise<void> {

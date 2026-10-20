@@ -6,6 +6,7 @@ import { getTrend } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
 import { WeightChart } from '../../src/components/WeightChart';
 import { formatKg, formatLocalDate } from '../../src/format';
+import { useScreenPadding } from '../../src/safe-area';
 
 const RANGES = [
   { days: 30, label: '1개월' },
@@ -45,6 +46,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 // 체중 그래프 + 남은 kg·기울기·도달 예상 + 최근 7일 평균 섭취(spec 2.5)
 export default function TrendScreen() {
+  const screenPadding = useScreenPadding(16, 24);
   const [days, setDays] = useState<number>(RANGES[0].days);
   const [trend, setTrend] = useState<TrendResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function TrendScreen() {
   const intake = trend?.intake;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, screenPadding]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -148,7 +150,7 @@ export default function TrendScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingTop: 48, gap: 16 },
+  container: { padding: 20, gap: 16 },
   header: { gap: 8 },
   back: { fontSize: 16, color: '#555' },
   title: { fontSize: 22, fontWeight: '600' },

@@ -2,15 +2,20 @@ import type { HomeResponse } from '@kkilog/contracts';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getHome } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
 import { DailySummaryCard } from '../../src/components/DailySummaryCard';
 import { MealListItem } from '../../src/components/MealListItem';
 import { WeightRow } from '../../src/components/WeightRow';
 import { formatLocalDate, shiftLocalDate } from '../../src/format';
+import { useScreenPadding } from '../../src/safe-area';
 
 // 대시보드(spec 2.3). date가 null이면 오늘(서버 타임존 기준).
 export default function HomeScreen() {
+  // 아래 [기록하기]가 덮는 높이(약 100)만큼 스크롤 끝에 여유를 둔다.
+  const screenPadding = useScreenPadding(16, 120);
+  const insets = useSafeAreaInsets();
   const [date, setDate] = useState<string | null>(null);
   const [home, setHome] = useState<HomeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +59,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, screenPadding]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
         <View style={styles.topBar}>
@@ -107,7 +112,7 @@ export default function HomeScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.bottom}>
+      <View style={[styles.bottom, { paddingBottom: 20 + insets.bottom }]}>
         <Pressable style={styles.recordButton} onPress={() => router.push('/record')}>
           <Text style={styles.recordText}>기록하기</Text>
         </Pressable>
@@ -118,7 +123,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#fff' },
-  container: { padding: 20, paddingTop: 48, paddingBottom: 120, gap: 16 },
+  container: { padding: 20, gap: 16 },
   topBar: { flexDirection: 'row', justifyContent: 'flex-end', gap: 20 },
   link: { color: '#1565c0', fontSize: 15 },
   dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

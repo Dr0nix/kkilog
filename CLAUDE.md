@@ -48,7 +48,7 @@ pnpm 워크스페이스 모노레포
 - 스펙과 다르게 구현했다면 같은 커밋에서 `docs/spec.md`도 고친다.
 
 ## 작업 방식
-- feature 브랜치 → `dev` PR. `main` 직접 커밋 금지.
+- feature 브랜치 → `dev` PR. `main` 직접 커밋 금지. 운영 배포는 `dev` → `main` PR로만 한다(`main` = Vercel Production).
 - PR 하나 = `docs/spec.md` 11절 PR 계획의 한 행. PR 안에서는 의미 단위(마이그레이션 하나, 라우트 하나, 화면 하나 등)로 커밋을 나눈다.
 - `packages/domain`은 프레임워크·DB 의존 없는 순수 함수 + 유닛 테스트 필수. 테스트는 임시값이 아니라 규칙을 검증한다(파라미터는 `params.ts`에서 읽어서 검사).
 - CI(lint → test → typecheck/build)는 DB·외부 API에 접속하지 않고 APK도 빌드하지 않는다. Gemini 호출은 테스트에서 고정 fixture로 대체한다.

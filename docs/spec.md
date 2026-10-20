@@ -316,9 +316,13 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취 |
 
 ## 9. 빌드·배포
-- API: Vercel(`apps/api`), `dev` → preview, `main` → 운영
+- API: Vercel 프로젝트(운영자의 기존 Vercel 계정에 별도 프로젝트, Root Directory `apps/api`). 운영 주소 `https://api-rouge-kappa-59.vercel.app`
+  - `main` → 운영(Production), `dev`·feature 브랜치 → preview
+  - 릴리스: `dev` → `main` PR을 merge하면 운영에 배포된다. `main`엔 이 PR 말고는 들어가지 않는다
+  - preview 배포는 Vercel 배포 보호(로그인 필요)가 걸려 앱에서 직접 부를 수 없다. 앱 개발은 로컬 api 서버(`next dev`)나 운영 주소로 한다
+  - 환경변수(`DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `BLOB_READ_WRITE_TOKEN`)는 Vercel 프로젝트 설정에 둔다. DB·Blob이 하나라 Production·Preview 값이 같다
 - DB: 운영·preview·로컬 모두 기존 Neon 프로젝트의 기본 브랜치 하나. 같은 `DATABASE_URL`을 쓴다
-- Vercel Blob: preview·운영 store 분리. Hobby 플랜에서 private store·서명 URL이 되는지 PR 5에서 먼저 확인하고, 안 되면 API가 사진을 대신 내려주는 프록시 라우트로 대체(앱에 Blob URL을 노출하지 않는 원칙은 유지)
+- Vercel Blob: private store 하나를 운영·preview·로컬이 같이 쓴다(DB와 같은 이유). Hobby 플랜에서 private 업로드·서명 URL(`issueSignedToken` + `presignUrl`, `@vercel/blob` 2.8) 동작 확인함(2026-10-20): 서명 없는 URL·경로 바꾼 URL·만료된 URL은 403
 - APK: EAS Build(무료 플랜 월 빌드 횟수 제한) 또는 로컬 `expo prebuild` + Gradle 빌드. 서명 키스토어는 저장소에 넣지 않는다.
 - JS만 바뀐 수정은 EAS Update(OTA)로 배포해 재설치 없이 반영. 네이티브 모듈이 바뀌면 APK 재배포.
 - 사이드로딩 제약: 구글 개발자 인증 요구가 2027년 전 세계로 확대 예정. 그 전에 취미 개발자용 인증을 해두거나 ADB 설치로 대응.

@@ -14,10 +14,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { ApiError, UnauthorizedError, submitOnboarding } from '../src/api/client';
+import { TextField } from '../src/components/TextField';
+import { useScreenPadding } from '../src/safe-area';
 
 type NumberField = 'age' | 'height_cm' | 'weight_kg' | 'target_weight_kg' | 'goal_months';
 
@@ -54,6 +55,7 @@ function toNumber(text: string): number {
 }
 
 export default function OnboardingScreen() {
+  const screenPadding = useScreenPadding(16, 24);
   const [nickname, setNickname] = useState('');
   const [sex, setSex] = useState<Sex | null>(null);
   const [numbers, setNumbers] = useState<Record<NumberField, string>>({
@@ -109,11 +111,11 @@ export default function OnboardingScreen() {
   if (result) return <Result target={result} />;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>처음 한 번만 입력해 주세요</Text>
 
       <Text style={styles.label}>닉네임</Text>
-      <TextInput style={styles.input} value={nickname} onChangeText={setNickname} maxLength={20} editable={!submitting} />
+      <TextField style={styles.input} value={nickname} onChangeText={setNickname} maxLength={20} editable={!submitting} />
 
       <Text style={styles.label}>성별</Text>
       <View style={styles.row}>
@@ -137,7 +139,7 @@ export default function OnboardingScreen() {
       {NUMBER_FIELDS.map((field) => (
         <View key={field.key}>
           <Text style={styles.label}>{field.label}</Text>
-          <TextInput
+          <TextField
             style={styles.input}
             value={numbers[field.key]}
             onChangeText={(text) => setNumbers((prev) => ({ ...prev, [field.key]: text }))}
@@ -182,11 +184,12 @@ export default function OnboardingScreen() {
 }
 
 function Result({ target }: { target: CalorieTarget }) {
+  const screenPadding = useScreenPadding(24, 24);
   const months = target.expected_days === null ? null : (target.expected_days / DAYS_PER_MONTH).toFixed(1);
   const macros = target.macros;
 
   return (
-    <View style={[styles.container, styles.center]}>
+    <View style={[styles.container, styles.center, screenPadding]}>
       <Text style={styles.label}>하루 목표 칼로리</Text>
       <Text style={styles.kcal}>{target.kcal.toLocaleString()} kcal</Text>
 
@@ -225,7 +228,7 @@ function Result({ target }: { target: CalorieTarget }) {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 24, paddingTop: 48, gap: 8 },
+  container: { padding: 24, gap: 8 },
   center: { flex: 1, justifyContent: 'center', gap: 16 },
   title: { fontSize: 22, fontWeight: '600', marginBottom: 8 },
   label: { fontSize: 14, color: '#555', marginTop: 8 },

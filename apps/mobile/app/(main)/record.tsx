@@ -1,17 +1,20 @@
 import { MEAL_TEXT_MAX_LENGTH, MEAL_TYPE_LABELS, MEAL_TYPES, type Meal, type MealType } from '@kkilog/contracts';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { createMeal } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
 import { MealResultSection } from '../../src/components/MealResultSection';
+import { TextField } from '../../src/components/TextField';
 import { defaultMealType } from '../../src/meal-type';
 import { type PickedPhoto, openAppSettings, pickPhoto } from '../../src/photo';
 import { newRequestId } from '../../src/request-id';
+import { useScreenPadding } from '../../src/safe-area';
 
 type Busy = null | 'photo' | 'analyze';
 
 export default function RecordScreen() {
+  const screenPadding = useScreenPadding(16, 24);
   const [mealType, setMealType] = useState<MealType>(() => defaultMealType(new Date()));
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [text, setText] = useState('');
@@ -71,7 +74,7 @@ export default function RecordScreen() {
   const canSubmit = (photo !== null || text.trim() !== '') && busy === null;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -118,7 +121,7 @@ export default function RecordScreen() {
             </Pressable>
           ) : null}
 
-          <TextInput
+          <TextField
             style={[styles.input, styles.multiline]}
             value={text}
             onChangeText={setText}
@@ -153,7 +156,7 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingTop: 48, gap: 14 },
+  container: { padding: 20, gap: 14 },
   header: { gap: 8 },
   back: { fontSize: 16, color: '#555' },
   title: { fontSize: 22, fontWeight: '600' },

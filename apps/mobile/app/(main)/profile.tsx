@@ -16,13 +16,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { ApiError, getProfile, updateProfile } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
+import { TextField } from '../../src/components/TextField';
 import { formatKg } from '../../src/format';
 import { type Form, type NumberField, changes, toForm } from '../../src/profile-form';
+import { useScreenPadding } from '../../src/safe-area';
 
 const NUMBER_FIELDS: { key: NumberField; label: string; keyboard: KeyboardTypeOptions }[] = [
   { key: 'age', label: '나이', keyboard: 'number-pad' },
@@ -60,6 +61,7 @@ function TargetSummary({ target }: { target: CurrentCalorieTarget | CalorieTarge
 // 프로필 수정(spec 2.2). 몸무게는 고치지 않고 체중 기록으로 남긴다.
 // 목표 칼로리에 영향을 주는 항목을 바꾸면 최근 체중으로 목표를 다시 정한다.
 export default function ProfileScreen() {
+  const screenPadding = useScreenPadding(16, 48);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [target, setTarget] = useState<CurrentCalorieTarget | CalorieTarget | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -125,7 +127,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -140,7 +142,7 @@ export default function ProfileScreen() {
       {profile && form ? (
         <>
           <Text style={styles.label}>닉네임</Text>
-          <TextInput style={styles.input} value={form.nickname} onChangeText={(nickname) => update({ nickname })} maxLength={20} />
+          <TextField style={styles.input} value={form.nickname} onChangeText={(nickname) => update({ nickname })} maxLength={20} />
 
           <Text style={styles.label}>성별</Text>
           <View style={styles.row}>
@@ -160,7 +162,7 @@ export default function ProfileScreen() {
           {NUMBER_FIELDS.map(({ key, label, keyboard }) => (
             <View key={key}>
               <Text style={styles.label}>{label}</Text>
-              <TextInput
+              <TextField
                 style={styles.input}
                 value={form[key]}
                 onChangeText={(text) => update({ [key]: text })}
@@ -220,7 +222,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingTop: 48, paddingBottom: 48, gap: 8 },
+  container: { padding: 20, gap: 8 },
   header: { gap: 8, marginBottom: 8 },
   back: { fontSize: 16, color: '#555' },
   title: { fontSize: 22, fontWeight: '600' },

@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { UnauthorizedError, getMe } from '../src/api/client';
 import { getStoredCode } from '../src/api/code-store';
+import { useScreenPadding } from '../src/safe-area';
 
 // 시작 화면: 저장된 코드가 있으면 확인해서 온보딩/홈으로, 없으면 코드 입력으로 보낸다.
 export default function Index() {
+  const screenPadding = useScreenPadding(24, 24);
   const [failed, setFailed] = useState(false);
 
   const start = useCallback(async () => {
@@ -28,7 +30,7 @@ export default function Index() {
   }, [start]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, screenPadding]}>
       {failed ? (
         <>
           <Text style={styles.message}>서버에 연결하지 못했습니다.</Text>

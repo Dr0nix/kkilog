@@ -29,27 +29,39 @@ export async function POST(request: Request) {
   if (existing) return privateJson<MealMutationResponse>({ meal: await toMealResponse(existing), attempt: null });
 
   const entryId = crypto.randomUUID();
-  const photoPath = input.photo ? mealPhotoPathname(userId, entryId) : null;
-  const photoBytes = input.photo ? Buffer.from(await input.photo.arrayBuffer()) : null;
-  if (photoPath && photoBytes) await uploadMealPhoto(photoPath, new Blob([photoBytes], { type: 'image/jpeg' }));
+  const photoPaths = input.photos.map((_, position) => mealPhotoPathname(userId, entryId, position));
+  const photoBytes = await Promise.all(
+    input.photos.map(async (photo, position) => {
+      const bytes = Buffer.from(await photo.arrayBuffer());
+      await uploadMealPhoto(mealPhotoPathname(userId, entryId, position), new Blob([bytes], { type: 'image/jpeg' }));
+      return bytes;
+    }),
+  );
 
+  // 끼니와 사진 행을 한 문장으로 넣는다(둘 중 하나만 저장되는 일이 없게). 첫 사진은 대표 사진으로 photo_path에도 둔다.
   const now = new Date();
   const inserted = await db()`
-    insert into kkilog.meal_entries (id, user_id, client_request_id, local_date, eaten_at, meal_type, input_text, photo_path)
-    values (${entryId}, ${userId}, ${input.clientRequestId}, ${localDate(now, timezone)}, ${now.toISOString()},
-            ${input.mealType}, ${input.text}, ${photoPath})
-    on conflict (user_id, client_request_id) do nothing
-    returning id, meal_type, local_date::text as local_date, eaten_at, input_text, photo_path`;
+    with entry as (
+      insert into kkilog.meal_entries (id, user_id, client_request_id, local_date, eaten_at, meal_type, input_text, photo_path)
+      values (${entryId}, ${userId}, ${input.clientRequestId}, ${localDate(now, timezone)}, ${now.toISOString()},
+              ${input.mealType}, ${input.text}, ${photoPaths[0] ?? null})
+      on conflict (user_id, client_request_id) do nothing
+      returning id, meal_type, local_date::text as local_date, eaten_at, input_text, photo_path
+    ), photos as (
+      insert into kkilog.meal_photos (entry_id, position, path)
+      select entry.id, p.ord - 1, p.path from entry, unnest(${photoPaths}::text[]) with ordinality as p(path, ord)
+    )
+    select * from entry`;
 
   const entry = inserted[0] as MealEntryRow | undefined;
   if (!entry) {
     // 같은 요청이 동시에 두 번 들어와 다른 쪽이 먼저 저장했다. 올린 사진은 지우고 그쪽 끼니를 돌려준다.
-    if (photoPath) await deletePhoto(photoPath);
+    await Promise.all(photoPaths.map(deletePhoto));
     const winner = await findEntryByRequestId(userId, input.clientRequestId);
     if (!winner) throw new Error('meal entry conflict without existing row');
     return privateJson<MealMutationResponse>({ meal: await toMealResponse(winner), attempt: null });
   }
 
-  const result = await analyzeAndSave(entry, null, photoBytes?.toString('base64'));
+  const result = await analyzeAndSave(entry, null, photoBytes.map((bytes) => bytes.toString('base64')));
   return privateJson<MealMutationResponse>({ meal: await toMealResponse(entry), attempt: attemptOf(result) });
 }

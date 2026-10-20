@@ -54,6 +54,7 @@
 - 끼니 태그(필수): 아침 / 점심 / 저녁 / 야식 / 간식. 현재 시각으로 기본 선택해 두고(5~10시 아침, 10~15시 점심, 15~17시 간식, 17~21시 저녁, 그 외 야식) 사용자가 바꿀 수 있다
 - 카메라·앨범 권한을 거부하면 안내를 보이고, 다시 물어볼 수 없게 거부됐으면 [설정에서 켜기]로 앱 설정을 연다
 - [카메라] / [앨범] 버튼 + 텍스트 칸(선택). 사진 없이 텍스트만도 가능
+- 사진은 한 끼에 최대 5장(앨범은 여러 장을 한 번에, 카메라는 한 장씩 추가). 상차림을 나눠 찍었거나 같은 음식을 가까이서 찍은 사진도 같이 올리고, 분석은 겹친 음식을 한 번만 센다(6.1). 첫 장이 대표 사진(홈 목록 썸네일)
 - [분석] → 원본 저장 → 분석 → 결과 카드(음식별 추정치 + 합계 + 추정 근거 메모)
 - 결과 카드를 먼저 보여주고, 이어서 **영양 조언**을 불러와 카드 아래에 붙인다(6.2). 조언을 못 불러오면 [조언 다시 받기]만 보이고 기록은 그대로 저장돼 있다.
 - 결과가 틀리면 [다시 분석]에 한 줄 보정("밥 반 공기만 먹음")을 붙여 재분석한다. 숫자를 직접 고치는 화면은 두지 않는다. 재분석하면 조언도 새 분석 기준으로 다시 받는다.
@@ -81,7 +82,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - `apps/api/src/server/` — DB·Storage·Gemini 클라이언트, 인증 헬퍼 (`server-only`)
   - `apps/api/src/llm/` — LLM 출력 스키마(zod)·JSON Schema 변환·응답 파싱, 재시도 판단 (`server-only` 없음 — 유닛 테스트 대상)
   - `apps/api/src/server/{gemini,prompts,calorie-target,meal-analysis}.ts` — Gemini 호출, 프롬프트 로드, 분석 실행(`server-only`)
-  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v2.md`(v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v2.md`(v1에 탄단지 비율 추가), `meal-advice/v1.md`
+  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v3.md`(v2에 한 끼 사진 여러 장 추가, v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v2.md`(v1에 탄단지 비율 추가), `meal-advice/v1.md`
   - `apps/api/scripts/access-code.ts` — 접속 코드 발급·폐기·조회(운영자가 직접 실행)
   - `packages/domain/src/v1/` — 순수 함수 + `params.ts`
   - `packages/contracts/src/` — API zod 스키마
@@ -102,9 +103,9 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
 - 재설치·기기 변경: 같은 코드를 다시 입력하면 기록을 그대로 쓴다. 코드를 잃어버렸으면 재발급(같은 사용자에 새 코드).
 
 ## 5. 데이터 모델
-원본: `users`, `access_codes`, `profiles`, `meal_entries`, `weight_logs` / 캐시: `meal_analyses`, `meal_advice` / 이력: `calorie_targets`
+원본: `users`, `access_codes`, `profiles`, `meal_entries`, `meal_photos`, `weight_logs` / 캐시: `meal_analyses`, `meal_advice` / 이력: `calorie_targets`
 - 모든 테이블은 `kkilog` 스키마. 기존 서비스의 스키마와 완전히 분리해 운영한다(서로 참조하지 않음, 같은 Neon 프로젝트의 저장 한도만 공유).
-- 아래는 최종 형태다. 0001(적용됨)에 있던 `allowed_emails` 삭제, `users`·`access_codes` 추가, `profiles.user_id` FK는 0002(적용됨)에서, `calorie_targets`의 탄단지 목표 컬럼은 0003, `meal_advice`는 0004에서 반영한다.
+- 아래는 최종 형태다. 0001(적용됨)에 있던 `allowed_emails` 삭제, `users`·`access_codes` 추가, `profiles.user_id` FK는 0002(적용됨)에서, `calorie_targets`의 탄단지 목표 컬럼은 0003, `meal_advice`는 0004, `meal_photos`는 0005에서 반영한다.
 
 ```sql
 create schema if not exists kkilog;
@@ -159,13 +160,22 @@ create table meal_entries (               -- 원본
   eaten_at timestamptz not null,
   meal_type text not null check (meal_type in ('breakfast','lunch','dinner','late_night','snack')),
   input_text text,
-  photo_path text,                        -- Blob pathname (URL 아님)
+  photo_path text,                        -- 대표(첫) 사진 Blob pathname (URL 아님). 사진 목록은 meal_photos가 기준(0005)
   deleted_at timestamptz,
   created_at timestamptz not null default now(),
   check (input_text is not null or photo_path is not null),
   unique (user_id, client_request_id)
 );
 create index on meal_entries (user_id, local_date);
+
+create table meal_photos (                -- 원본. 한 끼 사진 최대 5장(0005)
+  id uuid primary key default gen_random_uuid(),
+  entry_id uuid not null references meal_entries on delete cascade,
+  position smallint not null check (position between 0 and 4),  -- 0이 대표 사진(= meal_entries.photo_path)
+  path text not null unique,              -- Blob pathname
+  created_at timestamptz not null default now(),
+  unique (entry_id, position)
+);
 
 create table meal_analyses (              -- 캐시. 재분석 시 행 추가
   id uuid primary key default gen_random_uuid(),
@@ -225,7 +235,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 );
 ```
 - 기록 테이블은 `profiles`를 참조한다 → 온보딩 전에는 기록이 생길 수 없다.
-- 사진 경로는 `meals/{user_id}/{entry_id}.jpg`. DB엔 pathname만 저장하고, 응답할 때마다 서명 URL을 새로 만든다. 서명 URL은 그 사진 하나만 읽을 수 있고 10분 뒤 만료된다(`issueSignedToken` + `presignUrl`).
+- 끼니 사진은 `meal_photos`(0005, `entry_id`·`position` 0~4·`path`)에 순서대로 둔다. 경로는 `meals/{user_id}/{entry_id}-{position}.jpg`(0005 전 사진은 `meals/{user_id}/{entry_id}.jpg`로 남아 있고 0번으로 옮겨 둠). `meal_entries.photo_path`는 대표 사진으로 같이 저장한다(기존 CHECK와 예전 앱 호환). DB엔 pathname만 저장하고, 응답할 때마다 서명 URL을 새로 만든다. 서명 URL은 그 사진 하나만 읽을 수 있고 10분 뒤 만료된다(`issueSignedToken` + `presignUrl`).
 - 끼니의 현재값 = 해당 entry의 가장 최근 `status='ok'` 분석. `ok` 분석이 없는 끼니는 합계에서 뺀다.
 - 체중 기록 삭제·수정 API는 두지 않는다. 오입력은 운영자가 DB에서 직접 정리한다.
 - `users`·`access_codes`는 `scripts/access-code.ts`로만 관리한다.
@@ -238,7 +248,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 끼니마다 Gemini를 **두 번** 부른다: 6.1 분석(숫자 확정) → 6.2 조언(문장). 분석 호출에는 이번 끼니 입력만 넣는다. 오늘의 다른 끼니·목표 같은 맥락이 들어가면 같은 사진에도 추정치가 달라질 수 있어서(일관성 원칙), 맥락은 조언 호출에만 준다.
 
 ### 6.1 끼니 분석
-1. 입력: 사진(선택) + `input_text`(선택) + `correction_text`(재분석 시). 다른 끼니·목표·프로필은 넣지 않는다
+1. 입력: 사진(0~5장, 모두 같은 한 끼) + `photo_count` + `input_text`(선택) + `correction_text`(재분석 시). 다른 끼니·목표·프로필은 넣지 않는다
 2. Gemini 구조화 출력(`responseSchema`), temperature 0
 3. LLM 출력 스키마
    ```json
@@ -322,8 +332,8 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리·탄단지 비율(하한 보정, 그램은 서버 계산) → 한 트랜잭션 저장. 응답에 목표 칼로리·탄단지 목표(g)·하한 보정 여부·예상 도달 기간. 이미 있으면 `409 PROFILE_EXISTS`(Gemini 호출 전에 확인), Gemini 실패·응답 이상·상한 초과면 `503 UPSTREAM_UNAVAILABLE` |
 | GET/PATCH | /api/profile | 조회 → `{ profile(나이는 오늘 기준, 최근 체중 포함), calorie_target(현재 목표) }`. 수정은 바꾼 항목만(몸무게 제외) → `{ profile, new_calorie_target }`. 목표 칼로리 관련 항목이 실제로 바뀌면 최근 체중으로 Gemini가 목표를 다시 정하고(목표 기간은 지금부터) 프로필과 한 트랜잭션으로 저장, 아니면 `new_calorie_target: null`. Gemini 실패면 `503`(아무것도 저장 안 함) |
 | GET | /api/home?date= | 해당일(없으면 오늘) 섭취 합계·목표(그날 유효했던 행)·끼니 목록(먹은 시각 순, 각 끼니는 `GET /api/meals/:id`와 같은 형태)·체중(그날 기록 여부, 그날까지 최근 실측) |
-| POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 3MB 이하) — 둘 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
-| GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL |
+| POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 같은 이름으로 최대 5번, 장당 3MB·합계 4MB 이하, 보낸 순서가 사진 순서) — 사진과 텍스트 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
+| GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL(`photo_urls` 순서대로, `photo_url`은 첫 장 — 예전 앱 호환) |
 | POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |
 | POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2) → `{ advice: { text, analysis_created_at, created_at } }`. 현재 ok 분석이 없으면 `409 ANALYSIS_REQUIRED`, Gemini 실패·응답 이상이면 `503 UPSTREAM_UNAVAILABLE`(저장 안 함) |
 | DELETE | /api/meals/:id | soft delete → 204. 지운 끼니는 없는 것으로 본다(이후 조회·재분석·삭제 404). 사진은 보관 기간 정책이 정해질 때까지 남긴다 |
@@ -367,6 +377,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | 10 | 앱 홈·추세 화면(차트는 `react-native-svg`로 직접 그림), 프로필 수정(목표 칼로리 재계산 포함) |
 | 11 | 조언 장기 맥락: 최근 기록 요약 순수 함수(7일 평균·목표 대비·반복 패턴) + 테스트, 조언 프롬프트 v2·입력 확장(6.2) |
 | 12 | APK 빌드·서명·EAS Update(`expo-updates`) 설정, 설치 안내 |
+| 13 | 한 끼 사진 최대 5장: 0005 마이그레이션(`meal_photos`), 끼니 분석 프롬프트 v3(겹친 음식은 한 번만), 업로드·응답 형태(`photo_urls`) / 앱 여러 장 선택·썸네일·넘겨 보기 |
 
 ## 12. 배포 후 확인 목록
 - 지인 기기(삼성 등)에서 APK 설치(출처를 알 수 없는 앱 허용), 첫 실행 → 접속 코드 입력 → 온보딩 → 홈

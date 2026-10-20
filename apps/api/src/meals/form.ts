@@ -1,16 +1,23 @@
-import { CREATE_MEAL_FIELDS, CreateMealFieldsSchema, type MealType } from '@kkilog/contracts';
+import {
+  CREATE_MEAL_FIELDS,
+  CreateMealFieldsSchema,
+  MEAL_PHOTO_MAX_BYTES,
+  MEAL_PHOTOS_MAX,
+  MEAL_PHOTOS_MAX_TOTAL_BYTES,
+  type MealType,
+} from '@kkilog/contracts';
 
-// 앱이 긴 변 1024px JPEG(품질 0.7, 보통 ~200KB)로 줄여 보낸다. Vercel 함수 요청 본문 한도(4.5MB)보다 작게 잡는다.
-export const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
-
+// 앱이 긴 변 1024px JPEG(품질 0.7, 보통 ~200KB)로 줄여 보낸다. 장수·크기 한도는 contracts에 있다.
 export type CreateMealInput = {
   mealType: MealType;
   clientRequestId: string;
   text: string | null;
-  photo: File | null;
+  // 보낸 순서 그대로. 첫 장이 대표 사진
+  photos: File[];
 };
 
 // POST /api/meals multipart 본문을 검증한다. 사진과 텍스트 중 하나는 있어야 한다.
+// 사진은 같은 필드 이름으로 여러 번 온다(최대 MEAL_PHOTOS_MAX장). 사진 1장만 보내는 예전 앱도 그대로 통과한다.
 export function parseCreateMealForm(form: FormData): CreateMealInput | null {
   const text = form.get(CREATE_MEAL_FIELDS.text);
   const fields = CreateMealFieldsSchema.safeParse({
@@ -20,19 +27,20 @@ export function parseCreateMealForm(form: FormData): CreateMealInput | null {
   });
   if (!fields.success) return null;
 
-  const rawPhoto = form.get(CREATE_MEAL_FIELDS.photo);
-  let photo: File | null = null;
-  if (rawPhoto !== null) {
-    if (typeof rawPhoto === 'string') return null;
-    if (rawPhoto.type !== 'image/jpeg' || rawPhoto.size === 0 || rawPhoto.size > MAX_PHOTO_BYTES) return null;
-    photo = rawPhoto;
+  const photos: File[] = [];
+  for (const raw of form.getAll(CREATE_MEAL_FIELDS.photo)) {
+    if (typeof raw === 'string') return null;
+    if (raw.type !== 'image/jpeg' || raw.size === 0 || raw.size > MEAL_PHOTO_MAX_BYTES) return null;
+    photos.push(raw);
   }
+  if (photos.length > MEAL_PHOTOS_MAX) return null;
+  if (photos.reduce((sum, photo) => sum + photo.size, 0) > MEAL_PHOTOS_MAX_TOTAL_BYTES) return null;
 
-  if (!photo && !fields.data.text) return null;
+  if (photos.length === 0 && !fields.data.text) return null;
   return {
     mealType: fields.data.meal_type,
     clientRequestId: fields.data.client_request_id,
     text: fields.data.text,
-    photo,
+    photos,
   };
 }

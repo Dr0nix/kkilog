@@ -19,8 +19,13 @@ export const CREATE_MEAL_FIELDS = {
   mealType: 'meal_type',
   clientRequestId: 'client_request_id',
   text: 'text', // 선택
-  photo: 'photo', // 선택, image/jpeg
+  photo: 'photo', // 선택, image/jpeg. 같은 이름으로 여러 번(최대 MEAL_PHOTOS_MAX장), 보낸 순서가 사진 순서
 } as const;
+
+// 한 끼 사진 장수와 크기(spec 2.4). 전체 한도는 Vercel 함수 요청 본문 한도(4.5MB)보다 작게 잡는다.
+export const MEAL_PHOTOS_MAX = 5;
+export const MEAL_PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+export const MEAL_PHOTOS_MAX_TOTAL_BYTES = 4 * 1024 * 1024;
 
 export const CreateMealFieldsSchema = z.object({
   meal_type: z.enum(MEAL_TYPES),
@@ -96,7 +101,9 @@ export const MealSchema = z.object({
   local_date: z.string(),
   eaten_at: z.string(),
   input_text: z.string().nullable(),
-  // 짧게 유효한 서명 URL(spec 5). 사진이 없으면 null
+  // 짧게 유효한 서명 URL(spec 5). 사진 순서대로. 사진이 없으면 빈 배열
+  photo_urls: z.array(z.string()),
+  // 첫(대표) 사진 = photo_urls[0]. 사진이 없으면 null. 사진 1장만 알던 예전 앱을 위해 남겨 둔다
   photo_url: z.string().nullable(),
   // 현재 분석 = 가장 최근 ok 분석, 없으면 가장 최근 분석(실패), 분석이 아직 없으면 null
   analysis: MealAnalysisSchema.nullable(),

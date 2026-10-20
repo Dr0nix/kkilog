@@ -16,7 +16,10 @@ export function MealListItem({ meal, onPress }: { meal: Meal; onPress: () => voi
   return (
     <Pressable style={styles.row} onPress={onPress}>
       {meal.photo_url ? (
-        <Image source={{ uri: meal.photo_url }} style={styles.thumb} />
+        <View>
+          <Image source={{ uri: meal.photo_url }} style={styles.thumb} />
+          {meal.photo_urls.length > 1 ? <Text style={styles.more}>+{meal.photo_urls.length - 1}</Text> : null}
+        </View>
       ) : (
         <View style={[styles.thumb, styles.noPhoto]}>
           <Text style={styles.noPhotoText}>글</Text>
@@ -43,6 +46,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   thumb: { width: 52, height: 52, borderRadius: 8, backgroundColor: '#eee' },
   noPhoto: { alignItems: 'center', justifyContent: 'center' },
+  more: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    fontSize: 11,
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
   noPhotoText: { color: '#999', fontSize: 14 },
   body: { flex: 1, gap: 2 },
   type: { fontSize: 15, fontWeight: '600' },

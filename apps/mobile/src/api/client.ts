@@ -95,7 +95,8 @@ export type NewMeal = {
   mealType: MealType;
   clientRequestId: string;
   text: string | null;
-  photoUri: string | null;
+  // 보낸 순서가 사진 순서(첫 장이 대표). 최대 MEAL_PHOTOS_MAX장
+  photoUris: readonly string[];
 };
 
 // multipart로 보낸다. Content-Type은 fetch가 boundary와 함께 붙이므로 직접 지정하지 않는다.
@@ -104,10 +105,10 @@ export async function createMeal(meal: NewMeal): Promise<MealMutationResponse> {
   form.append(CREATE_MEAL_FIELDS.mealType, meal.mealType);
   form.append(CREATE_MEAL_FIELDS.clientRequestId, meal.clientRequestId);
   if (meal.text) form.append(CREATE_MEAL_FIELDS.text, meal.text);
-  if (meal.photoUri) {
-    // React Native의 FormData는 { uri, name, type }으로 파일을 붙인다.
-    form.append(CREATE_MEAL_FIELDS.photo, { uri: meal.photoUri, name: 'meal.jpg', type: 'image/jpeg' } as unknown as Blob);
-  }
+  meal.photoUris.forEach((uri, i) => {
+    // React Native의 FormData는 { uri, name, type }으로 파일을 붙인다. 같은 필드 이름으로 여러 번 붙인다.
+    form.append(CREATE_MEAL_FIELDS.photo, { uri, name: `meal-${i}.jpg`, type: 'image/jpeg' } as unknown as Blob);
+  });
   return MealMutationResponseSchema.parse(await request('/api/meals', { method: 'POST', body: form }));
 }
 

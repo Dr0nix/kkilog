@@ -21,17 +21,21 @@ export type MealAnalysisResult = { modelId: string; promptVersion: string; corre
 export async function analyzeMeal(args: {
   inputText: string | null;
   correctionText: string | null;
-  image: GeminiImage | null;
+  images: readonly GeminiImage[];
 }): Promise<MealAnalysisResult> {
   const base = { promptVersion: MEAL_ANALYSIS_PROMPT_VERSION, correctionText: args.correctionText };
-  const input: MealAnalysisLlmInput = { input_text: args.inputText, correction_text: args.correctionText };
+  const input: MealAnalysisLlmInput = {
+    photo_count: args.images.length,
+    input_text: args.inputText,
+    correction_text: args.correctionText,
+  };
 
   let result;
   try {
     result = await generateJson({
       systemInstruction: await loadPrompt(MEAL_ANALYSIS_PROMPT.name, MEAL_ANALYSIS_PROMPT.version),
       input,
-      images: args.image ? [args.image] : [],
+      images: args.images,
       responseJsonSchema: mealAnalysisResponseJsonSchema,
     });
   } catch (error) {

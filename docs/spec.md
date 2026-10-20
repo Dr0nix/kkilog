@@ -223,7 +223,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 );
 ```
 - 기록 테이블은 `profiles`를 참조한다 → 온보딩 전에는 기록이 생길 수 없다.
-- 사진 경로는 `meals/{user_id}/{entry_id}.jpg`. DB엔 pathname만 저장하고, 응답할 때마다 서명 URL을 새로 만든다.
+- 사진 경로는 `meals/{user_id}/{entry_id}.jpg`. DB엔 pathname만 저장하고, 응답할 때마다 서명 URL을 새로 만든다. 서명 URL은 그 사진 하나만 읽을 수 있고 10분 뒤 만료된다(`issueSignedToken` + `presignUrl`).
 - 끼니의 현재값 = 해당 entry의 가장 최근 `status='ok'` 분석. `ok` 분석이 없는 끼니는 합계에서 뺀다.
 - 체중 기록 삭제·수정 API는 두지 않는다. 오입력은 운영자가 DB에서 직접 정리한다.
 - `users`·`access_codes`는 `scripts/access-code.ts`로만 관리한다.
@@ -307,11 +307,11 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리·탄단지 비율(하한 보정, 그램은 서버 계산) → 한 트랜잭션 저장. 응답에 목표 칼로리·탄단지 목표(g)·하한 보정 여부·예상 도달 기간. 이미 있으면 `409 PROFILE_EXISTS`(Gemini 호출 전에 확인), Gemini 실패·응답 이상·상한 초과면 `503 UPSTREAM_UNAVAILABLE` |
 | GET/PATCH | /api/profile | 프로필 조회·수정. 목표 칼로리 관련 항목이 바뀌면 목표 칼로리를 다시 정해 함께 저장 |
 | GET | /api/home?date= | 해당일 섭취 합계·목표·끼니 목록(태그, 서명 사진 URL, 분석 상태)·체중 기록 여부 |
-| POST | /api/meals | multipart: meal_type, photo?, text?, client_request_id → 원본 저장 + 분석 → 결과. 중복이면 기존 결과 200 |
-| GET | /api/meals/:id | 상세 (현재 분석 + 사진 서명 URL) |
-| POST | /api/meals/:id/analyze | 재시도/재분석 (correction_text?) |
+| POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 3MB 이하) — 둘 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
+| GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL |
+| POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |
 | POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2). 현재 ok 분석이 없으면 409, Gemini 실패면 `503 UPSTREAM_UNAVAILABLE` |
-| DELETE | /api/meals/:id | soft delete |
+| DELETE | /api/meals/:id | soft delete → 204. 지운 끼니는 없는 것으로 본다(이후 조회·재분석·삭제 404). 사진은 보관 기간 정책이 정해질 때까지 남긴다 |
 | POST | /api/weights | weight_kg, client_request_id. 중복이면 기존 기록 200 |
 | GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취 |
 

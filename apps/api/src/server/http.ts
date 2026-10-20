@@ -11,3 +11,7 @@ export function privateJson<T>(body: T, status = 200): Response {
 export function errorJson(code: ErrorCode, status: number): Response {
   return privateJson<ErrorResponse>({ error: { code } }, status);
 }
+
+export function noContent(): Response {
+  return new Response(null, { status: 204, headers: PRIVATE_HEADERS });
+}

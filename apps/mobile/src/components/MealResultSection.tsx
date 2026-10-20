@@ -103,6 +103,7 @@ export function MealResultSection({
             style={styles.input}
             value={correction}
             onChangeText={setCorrection}
+            keyboardScroll="end"
             placeholder="예: 밥 반 공기만 먹음"
             maxLength={CORRECTION_TEXT_MAX_LENGTH}
             editable={!busy}

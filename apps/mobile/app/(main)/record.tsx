@@ -11,17 +11,16 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { createMeal } from '../../src/api/client';
 import { errorMessage } from '../../src/api/errors';
+import { KeyboardScroll } from '../../src/components/KeyboardScroll';
 import { MealResultSection } from '../../src/components/MealResultSection';
 import { TextField } from '../../src/components/TextField';
 import { defaultMealType } from '../../src/meal-type';
 import { type PickedPhoto, openAppSettings, pickPhotos } from '../../src/photo';
 import { newRequestId } from '../../src/request-id';
-import { useScreenPadding } from '../../src/safe-area';
 
 type Busy = null | 'photo' | 'analyze';
 
 export default function RecordScreen() {
-  const screenPadding = useScreenPadding(16, 24);
   const [mealType, setMealType] = useState<MealType>(() => defaultMealType(new Date()));
   const [photos, setPhotos] = useState<PickedPhoto[]>([]);
   const [text, setText] = useState('');
@@ -82,7 +81,7 @@ export default function RecordScreen() {
   const canAddPhoto = photos.length < MEAL_PHOTOS_MAX && busy === null;
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll contentContainerStyle={styles.container} paddingTop={16} paddingBottom={24}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -154,6 +153,7 @@ export default function RecordScreen() {
             style={[styles.input, styles.multiline]}
             value={text}
             onChangeText={setText}
+            keyboardScroll="end"
             placeholder="먹은 것을 적어도 돼요 (예: 삶은 계란 3개, 프로틴음료 1개)"
             multiline
             maxLength={MEAL_TEXT_MAX_LENGTH}
@@ -180,7 +180,7 @@ export default function RecordScreen() {
           </View>
         </>
       )}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

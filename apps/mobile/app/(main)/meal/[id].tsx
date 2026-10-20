@@ -1,18 +1,17 @@
 import { MEAL_TYPE_LABELS, type Meal } from '@kkilog/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ApiError, deleteMeal, getMeal } from '../../../src/api/client';
 import { errorMessage } from '../../../src/api/errors';
+import { KeyboardScroll } from '../../../src/components/KeyboardScroll';
 
 const NOT_FOUND_TEXT = '지워졌거나 없는 기록이에요.';
 import { MealResultSection } from '../../../src/components/MealResultSection';
 import { formatTime } from '../../../src/format';
-import { useScreenPadding } from '../../../src/safe-area';
 
 // 홈 끼니 목록에서 들어오는 상세(spec 2.3). 결과·조언·다시 분석·삭제.
 export default function MealDetailScreen() {
-  const screenPadding = useScreenPadding(16, 24);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [meal, setMeal] = useState<Meal | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +46,7 @@ export default function MealDetailScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll contentContainerStyle={styles.container} paddingTop={16} paddingBottom={24}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -96,7 +95,7 @@ export default function MealDetailScreen() {
           ) : null}
         </View>
       ) : null}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

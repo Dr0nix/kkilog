@@ -1,14 +1,13 @@
 import { normalizeAccessCode } from '@kkilog/contracts';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { UnauthorizedError, getMe } from '../src/api/client';
 import { storeCode } from '../src/api/code-store';
+import { KeyboardScroll } from '../src/components/KeyboardScroll';
 import { TextField } from '../src/components/TextField';
-import { useScreenPadding } from '../src/safe-area';
 
 export default function AccessCodeScreen() {
-  const screenPadding = useScreenPadding(24, 24);
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +32,7 @@ export default function AccessCodeScreen() {
   }
 
   return (
-    <View style={[styles.container, screenPadding]}>
+    <KeyboardScroll contentContainerStyle={styles.container} paddingTop={24} paddingBottom={24}>
       <Text style={styles.title}>접속 코드</Text>
       <Text style={styles.help}>받은 코드를 입력하거나 붙여 넣으세요. 처음 한 번만 입력하면 됩니다.</Text>
       <TextField
@@ -55,7 +54,7 @@ export default function AccessCodeScreen() {
       >
         {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>확인</Text>}
       </Pressable>
-    </View>
+    </KeyboardScroll>
   );
 }
 

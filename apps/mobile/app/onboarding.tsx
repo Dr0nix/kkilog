@@ -11,12 +11,12 @@ import {
   ActivityIndicator,
   type KeyboardTypeOptions,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { ApiError, UnauthorizedError, submitOnboarding } from '../src/api/client';
+import { KeyboardScroll } from '../src/components/KeyboardScroll';
 import { TextField } from '../src/components/TextField';
 import { useScreenPadding } from '../src/safe-area';
 
@@ -55,7 +55,6 @@ function toNumber(text: string): number {
 }
 
 export default function OnboardingScreen() {
-  const screenPadding = useScreenPadding(16, 24);
   const [nickname, setNickname] = useState('');
   const [sex, setSex] = useState<Sex | null>(null);
   const [numbers, setNumbers] = useState<Record<NumberField, string>>({
@@ -111,7 +110,7 @@ export default function OnboardingScreen() {
   if (result) return <Result target={result} />;
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll contentContainerStyle={styles.container} paddingTop={16} paddingBottom={24}>
       <Text style={styles.title}>처음 한 번만 입력해 주세요</Text>
 
       <Text style={styles.label}>닉네임</Text>
@@ -179,7 +178,7 @@ export default function OnboardingScreen() {
           <Text style={styles.buttonText}>목표 칼로리 계산하기</Text>
         )}
       </Pressable>
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

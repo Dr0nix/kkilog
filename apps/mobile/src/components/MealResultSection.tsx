@@ -2,7 +2,7 @@ import { CORRECTION_TEXT_MAX_LENGTH, type Meal } from '@kkilog/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { UnauthorizedError, analyzeMeal, getMealAdvice } from '../api/client';
-import { NETWORK_ERROR, shouldShowError } from '../api/errors';
+import { errorMessage } from '../api/errors';
 import { type AdviceView, MealAdviceCard } from './MealAdviceCard';
 import { MealResultCard } from './MealResultCard';
 import { TextField } from './TextField';
@@ -66,7 +66,7 @@ export function MealResultSection({
         setCorrection('');
       }
     } catch (e) {
-      if (shouldShowError(e)) setError(NETWORK_ERROR);
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -103,6 +103,7 @@ export function MealResultSection({
             style={styles.input}
             value={correction}
             onChangeText={setCorrection}
+            keyboardScroll="end"
             placeholder="예: 밥 반 공기만 먹음"
             maxLength={CORRECTION_TEXT_MAX_LENGTH}
             editable={!busy}

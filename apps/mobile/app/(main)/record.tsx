@@ -1,4 +1,11 @@
-import { MEAL_TEXT_MAX_LENGTH, MEAL_TYPE_LABELS, MEAL_TYPES, type Meal, type MealType } from '@kkilog/contracts';
+import {
+  MEAL_PHOTOS_MAX,
+  MEAL_TEXT_MAX_LENGTH,
+  MEAL_TYPE_LABELS,
+  MEAL_TYPES,
+  type Meal,
+  type MealType,
+} from '@kkilog/contracts';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,7 +14,7 @@ import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
 import { MealResultSection } from '../../src/components/MealResultSection';
 import { TextField } from '../../src/components/TextField';
 import { defaultMealType } from '../../src/meal-type';
-import { type PickedPhoto, openAppSettings, pickPhoto } from '../../src/photo';
+import { type PickedPhoto, openAppSettings, pickPhotos } from '../../src/photo';
 import { newRequestId } from '../../src/request-id';
 import { useScreenPadding } from '../../src/safe-area';
 
@@ -16,7 +23,7 @@ type Busy = null | 'photo' | 'analyze';
 export default function RecordScreen() {
   const screenPadding = useScreenPadding(16, 24);
   const [mealType, setMealType] = useState<MealType>(() => defaultMealType(new Date()));
-  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
   const [text, setText] = useState('');
   // 같은 기록을 다시 보낼 때는 같은 id를 써서 중복 기록을 막는다(spec 3). 새 기록을 시작할 때만 바꾼다.
   const [requestId, setRequestId] = useState(newRequestId);
@@ -30,15 +37,15 @@ export default function RecordScreen() {
   // 내용이 바뀌면 다른 기록이므로 id도 바꾼다. 같은 내용을 다시 보낼 때만 같은 id가 유지된다.
   useEffect(() => {
     setRequestId(newRequestId());
-  }, [mealType, photo, text]);
+  }, [mealType, photos, text]);
 
   async function choosePhoto(source: 'camera' | 'library') {
     setError(null);
     setPermissionBlocked(false);
     setBusy('photo');
     try {
-      const result = await pickPhoto(source);
-      if (result.status === 'picked') setPhoto(result.photo);
+      const result = await pickPhotos(source, MEAL_PHOTOS_MAX - photos.length);
+      if (result.status === 'picked') setPhotos((prev) => [...prev, ...result.photos].slice(0, MEAL_PHOTOS_MAX));
       else if (result.status === 'blocked') setPermissionBlocked(true);
       else if (result.status === 'denied') setError(source === 'camera' ? '카메라 권한이 필요해요.' : '사진 권한이 필요해요.');
     } catch {
@@ -52,7 +59,7 @@ export default function RecordScreen() {
     setError(null);
     setBusy('analyze');
     try {
-      const res = await createMeal({ mealType, clientRequestId: requestId, text: text.trim() || null, photoUri: photo?.uri ?? null });
+      const res = await createMeal({ mealType, clientRequestId: requestId, text: text.trim() || null, photoUris: photos.map((p) => p.uri) });
       setFirstError(res.attempt?.status === 'failed' ? '분석하지 못했어요. 기록은 저장돼 있으니 다시 시도해 주세요.' : null);
       setMeal(res.meal);
     } catch (e) {
@@ -65,13 +72,14 @@ export default function RecordScreen() {
   function startOver() {
     setMeal(null);
     setFirstError(null);
-    setPhoto(null);
+    setPhotos([]);
     setText('');
     setError(null);
     setMealType(defaultMealType(new Date()));
   }
 
-  const canSubmit = (photo !== null || text.trim() !== '') && busy === null;
+  const canSubmit = (photos.length > 0 || text.trim() !== '') && busy === null;
+  const canAddPhoto = photos.length < MEAL_PHOTOS_MAX && busy === null;
 
   return (
     <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
@@ -97,23 +105,44 @@ export default function RecordScreen() {
             ))}
           </View>
 
-          {photo ? (
-            <View style={styles.preview}>
-              <Image source={{ uri: photo.uri }} style={styles.previewImage} resizeMode="cover" />
-              <Pressable onPress={() => setPhoto(null)} disabled={busy !== null}>
-                <Text style={styles.link}>사진 빼기</Text>
-              </Pressable>
-            </View>
+          {photos.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
+              {photos.map((photo, index) => (
+                <View key={photo.uri} style={styles.thumbWrap}>
+                  <Image source={{ uri: photo.uri }} style={styles.thumb} resizeMode="cover" />
+                  {index === 0 ? <Text style={styles.coverBadge}>대표</Text> : null}
+                  <Pressable
+                    style={styles.removeButton}
+                    onPress={() => setPhotos((prev) => prev.filter((p) => p.uri !== photo.uri))}
+                    disabled={busy !== null}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.removeText}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
           ) : null}
 
           <View style={styles.row}>
-            <Pressable style={[styles.secondary, styles.flex]} onPress={() => void choosePhoto('camera')} disabled={busy !== null}>
+            <Pressable
+              style={[styles.secondary, styles.flex, !canAddPhoto && styles.disabled]}
+              onPress={() => void choosePhoto('camera')}
+              disabled={!canAddPhoto}
+            >
               <Text style={styles.secondaryText}>카메라</Text>
             </Pressable>
-            <Pressable style={[styles.secondary, styles.flex]} onPress={() => void choosePhoto('library')} disabled={busy !== null}>
+            <Pressable
+              style={[styles.secondary, styles.flex, !canAddPhoto && styles.disabled]}
+              onPress={() => void choosePhoto('library')}
+              disabled={!canAddPhoto}
+            >
               <Text style={styles.secondaryText}>앨범</Text>
             </Pressable>
           </View>
+          <Text style={styles.hint}>
+            사진 {photos.length}/{MEAL_PHOTOS_MAX}장 · 한 끼를 여러 장으로 찍었으면 같이 올려 주세요(같은 음식은 한 번만 셉니다)
+          </Text>
 
           {permissionBlocked ? (
             <Pressable onPress={openAppSettings}>
@@ -166,8 +195,34 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: '#222', borderColor: '#222' },
   chipText: { fontSize: 15 },
   chipTextSelected: { color: '#fff' },
-  preview: { gap: 6, alignItems: 'flex-end' },
-  previewImage: { width: '100%', aspectRatio: 4 / 3, borderRadius: 8, backgroundColor: '#eee' },
+  thumbs: { gap: 8 },
+  thumbWrap: { width: 120, height: 120 },
+  thumb: { width: 120, height: 120, borderRadius: 8, backgroundColor: '#eee' },
+  coverBadge: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    fontSize: 11,
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeText: { color: '#fff', fontSize: 13 },
+  hint: { fontSize: 12, color: '#777' },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16 },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   primary: { backgroundColor: '#222', padding: 14, borderRadius: 8, alignItems: 'center' },

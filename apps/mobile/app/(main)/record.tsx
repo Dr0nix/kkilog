@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { createMeal } from '../../src/api/client';
-import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
+import { errorMessage } from '../../src/api/errors';
 import { MealResultSection } from '../../src/components/MealResultSection';
 import { TextField } from '../../src/components/TextField';
 import { defaultMealType } from '../../src/meal-type';
@@ -63,7 +63,7 @@ export default function RecordScreen() {
       setFirstError(res.attempt?.status === 'failed' ? '분석하지 못했어요. 기록은 저장돼 있으니 다시 시도해 주세요.' : null);
       setMeal(res.meal);
     } catch (e) {
-      if (shouldShowError(e)) setError(NETWORK_ERROR);
+      setError(errorMessage(e));
     } finally {
       setBusy(null);
     }

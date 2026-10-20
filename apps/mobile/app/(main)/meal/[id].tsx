@@ -3,7 +3,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ApiError, deleteMeal, getMeal } from '../../../src/api/client';
-import { NETWORK_ERROR, shouldShowError } from '../../../src/api/errors';
+import { errorMessage } from '../../../src/api/errors';
+
+const NOT_FOUND_TEXT = '지워졌거나 없는 기록이에요.';
 import { MealResultSection } from '../../../src/components/MealResultSection';
 import { formatTime } from '../../../src/format';
 import { useScreenPadding } from '../../../src/safe-area';
@@ -22,8 +24,7 @@ export default function MealDetailScreen() {
     try {
       setMeal((await getMeal(id)).meal);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'NOT_FOUND') setError('지워졌거나 없는 기록이에요.');
-      else if (shouldShowError(e)) setError(NETWORK_ERROR);
+      setError(e instanceof ApiError && e.code === 'NOT_FOUND' ? NOT_FOUND_TEXT : errorMessage(e));
     }
   }, [id]);
 
@@ -39,7 +40,7 @@ export default function MealDetailScreen() {
     } catch (e) {
       // 이미 지워졌으면 목적은 이룬 것이다.
       if (e instanceof ApiError && e.code === 'NOT_FOUND') router.back();
-      else if (shouldShowError(e)) setError(NETWORK_ERROR);
+      else setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -88,7 +89,7 @@ export default function MealDetailScreen() {
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.error}>{error}</Text>
-          {error === NETWORK_ERROR ? (
+          {!meal && error !== NOT_FOUND_TEXT ? (
             <Pressable onPress={() => void load()}>
               <Text style={styles.link}>다시 불러오기</Text>
             </Pressable>

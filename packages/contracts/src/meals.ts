@@ -120,3 +120,15 @@ export const MealMutationResponseSchema = z.object({
     .nullable(),
 });
 export type MealMutationResponse = z.infer<typeof MealMutationResponseSchema>;
+
+// POST /api/meals/:id/advice — 현재 분석 기준 영양 조언(spec 6.2). 이미 있으면 저장된 것을 돌려준다.
+export const MealAdviceSchema = z.object({
+  text: z.string(),
+  // 조언을 만든 분석의 created_at(= meal.analysis.created_at). 앱이 어떤 분석의 조언인지 맞춰 볼 때 쓴다.
+  analysis_created_at: z.string(),
+  created_at: z.string(),
+});
+export type MealAdvice = z.infer<typeof MealAdviceSchema>;
+
+export const MealAdviceResponseSchema = z.object({ advice: MealAdviceSchema });
+export type MealAdviceResponse = z.infer<typeof MealAdviceResponseSchema>;

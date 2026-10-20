@@ -44,7 +44,8 @@
 
 ### 2.3 홈 (대시보드)
 - 오늘 섭취 kcal / 목표 kcal, 탄·단·지 합계 / 탄·단·지 목표
-- 오늘 끼니 목록(끼니 태그, 사진 썸네일, 음식명, kcal) → 탭하면 상세
+- 오늘 끼니 목록(끼니 태그, 사진 썸네일, 음식명, kcal) → 탭하면 상세(결과·조언·[다시 분석]·지우기)
+- 날짜를 앞뒤로 넘겨 지난 날을 볼 수 있다(체중 기록은 오늘 화면에서만)
 - 분석 실패한 끼니도 목록에 [분석 실패 · 재시도] 표시로 보이되, 합계에선 빠진다
 - 체중: 오늘 기록 여부, [체중 기록] 버튼
 - 하단 큰 버튼: [기록하기]
@@ -80,7 +81,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - `apps/api/src/server/` — DB·Storage·Gemini 클라이언트, 인증 헬퍼 (`server-only`)
   - `apps/api/src/llm/` — LLM 출력 스키마(zod)·JSON Schema 변환·응답 파싱, 재시도 판단 (`server-only` 없음 — 유닛 테스트 대상)
   - `apps/api/src/server/{gemini,prompts,calorie-target,meal-analysis}.ts` — Gemini 호출, 프롬프트 로드, 분석 실행(`server-only`)
-  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v2.md`(v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v2.md`(v1에 탄단지 비율 추가)
+  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v2.md`(v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v2.md`(v1에 탄단지 비율 추가), `meal-advice/v1.md`
   - `apps/api/scripts/access-code.ts` — 접속 코드 발급·폐기·조회(운영자가 직접 실행)
   - `packages/domain/src/v1/` — 순수 함수 + `params.ts`
   - `packages/contracts/src/` — API zod 스키마
@@ -267,12 +268,21 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 - 입력(서버가 DB에서 모은다. 앱이 보낸 값은 쓰지 않음)
   - 이번 끼니: 끼니 태그, 먹은 시각, 음식별 추정치와 합계(서버 계산값)
   - 오늘(같은 `local_date`) 이 끼니 전에 먹은 끼니들: 태그·합계
-  - 오늘 합계(이번 끼니 포함)와 하루 목표(kcal·탄·단·지)
+  - 오늘 합계(이번 끼니 포함)와 하루 목표(kcal·탄·단·지), 목표까지 남은 양(목표 − 오늘 합계, 넘으면 음수)
+  - 합계·남은 양은 서버가 `packages/domain`으로 계산해 넣는다(모델에게 계산시키지 않음). 하루 목표는 조언을 만들 때의 현재 목표(가장 최근 `calorie_targets` 행)
+  - 조언에 쓴 입력은 `meal_advice.inputs`에 그대로 남긴다
 - Gemini 구조화 출력, temperature 0. 프롬프트는 `apps/api/prompts/meal-advice/v*.md`
 - LLM 출력 스키마: `{ "advice": "점심에 부족했던 단백질을 이번 끼니로 채웠어요. 남은 하루는 …" }`
 - 규칙: 한국어 1~3문장, 200자 이내. 오늘 목표 대비 부족·초과를 근거로 다음 끼니에 할 수 있는 구체적인 제안. 의학적 진단·처방은 하지 않는다.
 - 실패해도 분석·기록엔 영향 없다. 저장하지 않고 `503 UPSTREAM_UNAVAILABLE` → 앱은 [조언 다시 받기].
 - 탄단지 목표가 없는 사용자(calorie-target/v1로 온보딩)는 칼로리 목표만 넣는다.
+- 장기 맥락(meal-advice/v2): 오늘 하루만 보면 조언이 매번 새로 시작하는 느낌이라, 서버가 계산한 최근 기록 요약을 입력에 더한다. Gemini는 호출마다 독립적이므로 "기억"이 아니라 서버가 DB에서 매번 모아 넣는 방식이다.
+  - `recent_days`: 이 끼니 날짜의 전날까지 최근 7일 중 끼니를 기록한 날만으로 낸 하루 평균 섭취, 그 날들의 평균 목표 kcal과 차이, 목표 kcal × 1.1을 넘은 날 수, 단백질이 목표 × 0.8보다 적은 날 수, 야식 먹은 날 수(비율은 임시값, `params.ts`)
+  - `weight`: 추세 체중·목표까지 남은 kg·기울기·도달 상태·예상일(7.2와 같은 계산, 끼니 날짜 기준)
+  - `recent_highlight`: 조언에 덧붙일 흐름 **하나**를 서버가 고른다(모델에게 고르게 하면 매번 우선순위를 지키지 않았다). 순서: 오늘도 단백질 부족 + 최근 3일 이상 반복 → 이번이 야식 + 최근 야식 3일 이상 → 오늘 목표 초과 + 최근 초과 3일 이상 → 체중 정체 + 최근 평균이 목표보다 많음 → 순항 격려 → 없음. 반복 패턴은 기록한 날이 3일 이상일 때만(3일은 임시값)
+  - 숫자·패턴은 전부 서버가 `packages/domain`으로 계산한다. Gemini가 기록을 요약해 저장하는 메모 방식은 쓰지 않는다(요약이 틀리면 계속 따라다님 — 기록이 쌓인 뒤 7.2 적응형 목표와 함께 다시 검토)
+  - 끼니 분석 호출엔 여전히 맥락을 넣지 않는다
+  - 장기 기록이 Gemini 무료 티어로 더 많이 가므로 사용자에게 알린다
 
 ## 7. 목표 칼로리와 체중 추세
 ### 7.1 목표 칼로리·탄단지 목표 (Gemini가 정하고 저장)
@@ -296,25 +306,29 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 
 ### 7.2 체중 추세
 - 추세: 일별 체중의 지수이동평균(`packages/domain`). 평활 계수 α = 0.1(`params.ts`, 써 보면서 조정)
+  - 하루 체중값 = 그날 마지막 기록. 첫 추세값 = 첫 체중. 기록이 있는 날만 `trend += α × (체중 − trend)`, 기록이 없는 날은 전날 추세를 그대로 잇는다. 기록한 날은 직전 기록과의 간격 n일에 대해 α_eff = 1 − (1 − α)^n으로 갱신한다(매일 기록하면 α 그대로)
+  - 기울기(kg/주) = 최근 14일 추세 변화 × 7 ÷ 14. 기록 기간이 14일보다 짧으면 있는 만큼으로, 7일보다 짧으면 없음(임시값)
+  - 목표까지 남은 kg = 오늘 추세 − 목표 체중. 감량·증량 방향은 첫 체중과 목표로 정한다. 목표 쪽으로 가고 있으면 도달 예상일 = 오늘 + 남은 kg ÷ 하루 변화량(730일 넘으면 없음, 임시값)
+  - 7일 평균 섭취 = 오늘을 뺀 최근 7일 중 끼니를 기록한 날의 하루 합계 평균(기록 없는 날은 0kcal로 보지 않고 뺀다). 비교 목표는 그 날들에 유효했던 목표 kcal의 평균
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
-- 오류 응답은 `{ "error": { "code": ... } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 코드: `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `PROFILE_EXISTS`(409), `NOT_FOUND`(404), `INVALID_REQUEST`(400), `UPSTREAM_UNAVAILABLE`(503, Gemini 실패 — 잠시 후 재시도). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
+- 오류 응답은 `{ "error": { "code": ... } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 코드: `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `PROFILE_EXISTS`(409), `ANALYSIS_REQUIRED`(409, 조언을 받을 ok 분석이 없음), `NOT_FOUND`(404), `INVALID_REQUEST`(400), `UPSTREAM_UNAVAILABLE`(503, Gemini 실패 — 잠시 후 재시도). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
 
 | Method | Path | 설명 |
 | --- | --- | --- |
 | GET | /api/health | 배포 확인용 `{ ok: true }` (인증 없음, 개인 데이터 없음) |
 | GET | /api/me | Bearer 코드 확인 → `has_profile`. 없거나 폐기된 코드면 401 |
 | POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리·탄단지 비율(하한 보정, 그램은 서버 계산) → 한 트랜잭션 저장. 응답에 목표 칼로리·탄단지 목표(g)·하한 보정 여부·예상 도달 기간. 이미 있으면 `409 PROFILE_EXISTS`(Gemini 호출 전에 확인), Gemini 실패·응답 이상·상한 초과면 `503 UPSTREAM_UNAVAILABLE` |
-| GET/PATCH | /api/profile | 프로필 조회·수정. 목표 칼로리 관련 항목이 바뀌면 목표 칼로리를 다시 정해 함께 저장 |
-| GET | /api/home?date= | 해당일 섭취 합계·목표·끼니 목록(태그, 서명 사진 URL, 분석 상태)·체중 기록 여부 |
+| GET/PATCH | /api/profile | 조회 → `{ profile(나이는 오늘 기준, 최근 체중 포함), calorie_target(현재 목표) }`. 수정은 바꾼 항목만(몸무게 제외) → `{ profile, new_calorie_target }`. 목표 칼로리 관련 항목이 실제로 바뀌면 최근 체중으로 Gemini가 목표를 다시 정하고(목표 기간은 지금부터) 프로필과 한 트랜잭션으로 저장, 아니면 `new_calorie_target: null`. Gemini 실패면 `503`(아무것도 저장 안 함) |
+| GET | /api/home?date= | 해당일(없으면 오늘) 섭취 합계·목표(그날 유효했던 행)·끼니 목록(먹은 시각 순, 각 끼니는 `GET /api/meals/:id`와 같은 형태)·체중(그날 기록 여부, 그날까지 최근 실측) |
 | POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 3MB 이하) — 둘 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
 | GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL |
 | POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |
-| POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2). 현재 ok 분석이 없으면 409, Gemini 실패면 `503 UPSTREAM_UNAVAILABLE` |
+| POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2) → `{ advice: { text, analysis_created_at, created_at } }`. 현재 ok 분석이 없으면 `409 ANALYSIS_REQUIRED`, Gemini 실패·응답 이상이면 `503 UPSTREAM_UNAVAILABLE`(저장 안 함) |
 | DELETE | /api/meals/:id | soft delete → 204. 지운 끼니는 없는 것으로 본다(이후 조회·재분석·삭제 404). 사진은 보관 기간 정책이 정해질 때까지 남긴다 |
-| POST | /api/weights | weight_kg, client_request_id. 중복이면 기존 기록 200 |
-| GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취 |
+| POST | /api/weights | `{ weight_kg, client_request_id }` → `{ weight }`. 오늘(프로필 타임존) 날짜로 쌓는다. 중복이면 기존 기록 200. 프로필 없으면 `409 ONBOARDING_REQUIRED` |
+| GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취(7.2). `days`는 그래프 기간 7~365, 기본 30. 추세는 전체 기록으로 계산하고 그 기간만 잘라 보낸다 |
 
 ## 9. 빌드·배포
 - API: Vercel 프로젝트(운영자의 기존 Vercel 계정에 별도 프로젝트, Root Directory `apps/api`). 운영 주소 `https://api-rouge-kappa-59.vercel.app`
@@ -350,7 +364,8 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | 8 | 영양 조언: 0004 마이그레이션(`meal_advice`), 조언 프롬프트 v1·출력 스키마 + fixture 테스트, `POST /api/meals/:id/advice` / 결과 카드 아래 조언·[조언 다시 받기] |
 | 9 | 체중 기록 + 추세 순수 함수(v1) + 테스트, `/api/trend` |
 | 10 | 앱 홈·추세 화면(차트는 `react-native-svg`로 직접 그림), 프로필 수정(목표 칼로리 재계산 포함) |
-| 11 | APK 빌드·서명·EAS Update(`expo-updates`) 설정, 설치 안내 |
+| 11 | 조언 장기 맥락: 최근 기록 요약 순수 함수(7일 평균·목표 대비·반복 패턴) + 테스트, 조언 프롬프트 v2·입력 확장(6.2) |
+| 12 | APK 빌드·서명·EAS Update(`expo-updates`) 설정, 설치 안내 |
 
 ## 12. 배포 후 확인 목록
 - 지인 기기(삼성 등)에서 APK 설치(출처를 알 수 없는 앱 허용), 첫 실행 → 접속 코드 입력 → 온보딩 → 홈

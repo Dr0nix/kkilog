@@ -2,7 +2,7 @@ import { OnboardingRequestSchema, type OnboardingResponse } from '@kkilog/contra
 import { birthYearFromAge, daysUntilMonthsLater, localDate } from '@kkilog/domain';
 import { buildCalorieTargetInput } from '@/src/llm/calorie-target';
 import { authenticate } from '@/src/server/auth';
-import { decideCalorieTarget } from '@/src/server/calorie-target';
+import { decideCalorieTarget, insertCalorieTarget, toCalorieTargetResponse } from '@/src/server/calorie-target';
 import { db } from '@/src/server/db';
 import { GeminiError } from '@/src/server/gemini';
 import { errorJson, privateJson } from '@/src/server/http';
@@ -70,36 +70,12 @@ export async function POST(request: Request) {
       sql`
         insert into kkilog.weight_logs (user_id, client_request_id, local_date, weight_kg, source)
         values (${userId}, ${crypto.randomUUID()}, ${today}, ${body.weight_kg}, 'onboarding')`,
-      sql`
-        insert into kkilog.calorie_targets
-          (user_id, kcal, llm_kcal, maintenance_kcal, clamped, carb_pct, protein_pct, fat_pct, carb_g, protein_g, fat_g,
-           reason, inputs, model_id, prompt_version, raw_response)
-        values
-          (${userId}, ${target.kcal}, ${target.llmKcal}, ${target.maintenanceKcal}, ${target.clamped},
-           ${target.macros.carbPct}, ${target.macros.proteinPct}, ${target.macros.fatPct},
-           ${target.macros.carbG}, ${target.macros.proteinG}, ${target.macros.fatG}, ${target.reason},
-           ${JSON.stringify(target.inputs)}::jsonb, ${target.modelId}, ${target.promptVersion},
-           ${JSON.stringify(target.raw)}::jsonb)`,
+      insertCalorieTarget(sql, userId, target),
     ]);
   } catch (error) {
     if (isProfileConflict(error)) return errorJson('PROFILE_EXISTS', 409);
     throw error;
   }
 
-  return privateJson<OnboardingResponse>({
-    calorie_target: {
-      kcal: target.kcal,
-      clamped: target.clamped,
-      expected_days: target.expectedDays,
-      macros: {
-        carb_pct: target.macros.carbPct,
-        protein_pct: target.macros.proteinPct,
-        fat_pct: target.macros.fatPct,
-        carb_g: target.macros.carbG,
-        protein_g: target.macros.proteinG,
-        fat_g: target.macros.fatG,
-      },
-      reason: target.reason,
-    },
-  });
+  return privateJson<OnboardingResponse>({ calorie_target: toCalorieTargetResponse(target) });
 }

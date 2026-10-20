@@ -22,3 +22,18 @@ export const MACRO_PCT_MAX = 80;
 export const KCAL_PER_G_CARB = 4;
 export const KCAL_PER_G_PROTEIN = 4;
 export const KCAL_PER_G_FAT = 9;
+
+// 체중 추세(spec 7.2). 일별 체중의 지수이동평균 평활 계수. 써 보면서 조정한다.
+export const TREND_ALPHA = 0.1;
+// 추세 기울기는 최근 이 기간의 추세 변화로 계산한다(spec 2.5 "최근 14일 추세 기울기").
+export const TREND_SLOPE_WINDOW_DAYS = 14;
+export const TREND_MIN_SPAN_DAYS = 7; // TODO: 확정 필요 — 임시값 (기록 기간이 이보다 짧으면 기울기·도달 예상 없음)
+export const TREND_ETA_MAX_DAYS = 730; // TODO: 확정 필요 — 임시값 (이보다 오래 걸리면 도달 예상일을 내지 않음)
+
+// 평균 섭취는 오늘을 뺀 최근 이 기간(완료된 날)으로 계산한다(spec 8 /api/trend "7일 평균 섭취").
+export const INTAKE_AVERAGE_DAYS = 7;
+
+// 조언 장기 맥락(spec 6.2)의 반복 패턴 기준. 기록한 날 중 이 기준을 넘은 날 수를 센다.
+export const PATTERN_OVER_KCAL_RATIO = 1.1; // TODO: 확정 필요 — 임시값 (하루 섭취가 목표 kcal × 이 값을 넘으면 "목표 초과한 날")
+export const PATTERN_PROTEIN_SHORT_RATIO = 0.8; // TODO: 확정 필요 — 임시값 (단백질이 목표 × 이 값보다 적으면 "단백질 부족한 날")
+export const PATTERN_MIN_DAYS = 3; // TODO: 확정 필요 — 임시값 (최근 기록에서 같은 일이 이만큼 반복돼야 조언에서 짚는다. 기록한 날도 이만큼은 있어야 함)

@@ -1,11 +1,27 @@
 import {
   type AnalyzeMealRequest,
+  type CreateWeightRequest,
+  CreateWeightResponseSchema,
+  type CreateWeightResponse,
+  HomeResponseSchema,
+  type HomeResponse,
+  MealResponseSchema,
+  type MealResponse,
+  ProfileResponseSchema,
+  type ProfileResponse,
+  TrendResponseSchema,
+  type TrendResponse,
+  type UpdateProfileRequest,
+  UpdateProfileResponseSchema,
+  type UpdateProfileResponse,
   CREATE_MEAL_FIELDS,
   ErrorResponseSchema,
+  MealAdviceResponseSchema,
   MealMutationResponseSchema,
   MeResponseSchema,
   OnboardingResponseSchema,
   type ErrorCode,
+  type MealAdviceResponse,
   type MealMutationResponse,
   type MealType,
   type MeResponse,
@@ -56,12 +72,12 @@ async function request(path: string, init?: RequestInit, candidateCode?: string)
     const body = ErrorResponseSchema.safeParse(await res.json().catch(() => null));
     throw new ApiError(res.status, body.success ? body.data.error.code : undefined);
   }
-  return res.json();
+  return res.status === 204 ? null : res.json();
 }
 
-function postJson(path: string, body: unknown): Promise<unknown> {
+function sendJson(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<unknown> {
   return request(path, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -72,7 +88,7 @@ export async function getMe(candidateCode?: string): Promise<MeResponse> {
 }
 
 export async function submitOnboarding(body: OnboardingRequest): Promise<OnboardingResponse> {
-  return OnboardingResponseSchema.parse(await postJson('/api/onboarding', body));
+  return OnboardingResponseSchema.parse(await sendJson('POST', '/api/onboarding', body));
 }
 
 export type NewMeal = {
@@ -96,5 +112,39 @@ export async function createMeal(meal: NewMeal): Promise<MealMutationResponse> {
 }
 
 export async function analyzeMeal(mealId: string, body: AnalyzeMealRequest = {}): Promise<MealMutationResponse> {
-  return MealMutationResponseSchema.parse(await postJson(`/api/meals/${mealId}/analyze`, body));
+  return MealMutationResponseSchema.parse(await sendJson('POST', `/api/meals/${mealId}/analyze`, body));
+}
+
+// 현재 분석 기준 영양 조언. 이미 있으면 서버가 저장된 것을 돌려준다(spec 6.2).
+export async function getMealAdvice(mealId: string): Promise<MealAdviceResponse> {
+  return MealAdviceResponseSchema.parse(await request(`/api/meals/${mealId}/advice`, { method: 'POST' }));
+}
+
+// date가 없으면 서버가 오늘(프로필 타임존)로 본다.
+export async function getHome(date?: string): Promise<HomeResponse> {
+  return HomeResponseSchema.parse(await request(`/api/home${date ? `?date=${date}` : ''}`));
+}
+
+export async function getMeal(mealId: string): Promise<MealResponse> {
+  return MealResponseSchema.parse(await request(`/api/meals/${mealId}`));
+}
+
+export async function deleteMeal(mealId: string): Promise<void> {
+  await request(`/api/meals/${mealId}`, { method: 'DELETE' });
+}
+
+export async function createWeight(body: CreateWeightRequest): Promise<CreateWeightResponse> {
+  return CreateWeightResponseSchema.parse(await sendJson('POST', '/api/weights', body));
+}
+
+export async function getTrend(days?: number): Promise<TrendResponse> {
+  return TrendResponseSchema.parse(await request(`/api/trend${days ? `?days=${days}` : ''}`));
+}
+
+export async function getProfile(): Promise<ProfileResponse> {
+  return ProfileResponseSchema.parse(await request('/api/profile'));
+}
+
+export async function updateProfile(body: UpdateProfileRequest): Promise<UpdateProfileResponse> {
+  return UpdateProfileResponseSchema.parse(await sendJson('PATCH', '/api/profile', body));
 }

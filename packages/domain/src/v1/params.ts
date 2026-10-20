@@ -22,3 +22,13 @@ export const MACRO_PCT_MAX = 80;
 export const KCAL_PER_G_CARB = 4;
 export const KCAL_PER_G_PROTEIN = 4;
 export const KCAL_PER_G_FAT = 9;
+
+// 체중 추세(spec 7.2). 일별 체중의 지수이동평균 평활 계수. 써 보면서 조정한다.
+export const TREND_ALPHA = 0.1;
+// 추세 기울기는 최근 이 기간의 추세 변화로 계산한다(spec 2.5 "최근 14일 추세 기울기").
+export const TREND_SLOPE_WINDOW_DAYS = 14;
+export const TREND_MIN_SPAN_DAYS = 7; // TODO: 확정 필요 — 임시값 (기록 기간이 이보다 짧으면 기울기·도달 예상 없음)
+export const TREND_ETA_MAX_DAYS = 730; // TODO: 확정 필요 — 임시값 (이보다 오래 걸리면 도달 예상일을 내지 않음)
+
+// 평균 섭취는 오늘을 뺀 최근 이 기간(완료된 날)으로 계산한다(spec 8 /api/trend "7일 평균 섭취").
+export const INTAKE_AVERAGE_DAYS = 7;

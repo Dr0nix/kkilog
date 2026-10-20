@@ -36,3 +36,4 @@ export const INTAKE_AVERAGE_DAYS = 7;
 // 조언 장기 맥락(spec 6.2)의 반복 패턴 기준. 기록한 날 중 이 기준을 넘은 날 수를 센다.
 export const PATTERN_OVER_KCAL_RATIO = 1.1; // TODO: 확정 필요 — 임시값 (하루 섭취가 목표 kcal × 이 값을 넘으면 "목표 초과한 날")
 export const PATTERN_PROTEIN_SHORT_RATIO = 0.8; // TODO: 확정 필요 — 임시값 (단백질이 목표 × 이 값보다 적으면 "단백질 부족한 날")
+export const PATTERN_MIN_DAYS = 3; // TODO: 확정 필요 — 임시값 (최근 기록에서 같은 일이 이만큼 반복돼야 조언에서 짚는다. 기록한 날도 이만큼은 있어야 함)

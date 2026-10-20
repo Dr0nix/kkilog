@@ -32,3 +32,7 @@ export const TREND_ETA_MAX_DAYS = 730; // TODO: 확정 필요 — 임시값 (이
 
 // 평균 섭취는 오늘을 뺀 최근 이 기간(완료된 날)으로 계산한다(spec 8 /api/trend "7일 평균 섭취").
 export const INTAKE_AVERAGE_DAYS = 7;
+
+// 조언 장기 맥락(spec 6.2)의 반복 패턴 기준. 기록한 날 중 이 기준을 넘은 날 수를 센다.
+export const PATTERN_OVER_KCAL_RATIO = 1.1; // TODO: 확정 필요 — 임시값 (하루 섭취가 목표 kcal × 이 값을 넘으면 "목표 초과한 날")
+export const PATTERN_PROTEIN_SHORT_RATIO = 0.8; // TODO: 확정 필요 — 임시값 (단백질이 목표 × 이 값보다 적으면 "단백질 부족한 날")

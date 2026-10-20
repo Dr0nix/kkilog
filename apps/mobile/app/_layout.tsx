@@ -12,7 +12,8 @@ export default function RootLayout() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false }} />
-      <StatusBar style="auto" />
+      {/* 앱은 밝은 화면만 쓰므로 기기 다크 모드와 상관없이 상태 바 아이콘을 어두운 색으로 고정한다 */}
+      <StatusBar style="dark" />
     </>
   );
 }

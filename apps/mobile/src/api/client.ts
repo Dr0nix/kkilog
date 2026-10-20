@@ -1,8 +1,13 @@
 import {
+  type AnalyzeMealRequest,
+  CREATE_MEAL_FIELDS,
   ErrorResponseSchema,
+  MealMutationResponseSchema,
   MeResponseSchema,
   OnboardingResponseSchema,
   type ErrorCode,
+  type MealMutationResponse,
+  type MealType,
   type MeResponse,
   type OnboardingRequest,
   type OnboardingResponse,
@@ -68,4 +73,28 @@ export async function getMe(candidateCode?: string): Promise<MeResponse> {
 
 export async function submitOnboarding(body: OnboardingRequest): Promise<OnboardingResponse> {
   return OnboardingResponseSchema.parse(await postJson('/api/onboarding', body));
+}
+
+export type NewMeal = {
+  mealType: MealType;
+  clientRequestId: string;
+  text: string | null;
+  photoUri: string | null;
+};
+
+// multipart로 보낸다. Content-Type은 fetch가 boundary와 함께 붙이므로 직접 지정하지 않는다.
+export async function createMeal(meal: NewMeal): Promise<MealMutationResponse> {
+  const form = new FormData();
+  form.append(CREATE_MEAL_FIELDS.mealType, meal.mealType);
+  form.append(CREATE_MEAL_FIELDS.clientRequestId, meal.clientRequestId);
+  if (meal.text) form.append(CREATE_MEAL_FIELDS.text, meal.text);
+  if (meal.photoUri) {
+    // React Native의 FormData는 { uri, name, type }으로 파일을 붙인다.
+    form.append(CREATE_MEAL_FIELDS.photo, { uri: meal.photoUri, name: 'meal.jpg', type: 'image/jpeg' } as unknown as Blob);
+  }
+  return MealMutationResponseSchema.parse(await request('/api/meals', { method: 'POST', body: form }));
+}
+
+export async function analyzeMeal(mealId: string, body: AnalyzeMealRequest = {}): Promise<MealMutationResponse> {
+  return MealMutationResponseSchema.parse(await postJson(`/api/meals/${mealId}/analyze`, body));
 }

@@ -16,6 +16,16 @@ export async function findEntry(userId: string, entryId: string): Promise<MealEn
   return (rows[0] as MealEntryRow | undefined) ?? null;
 }
 
+// 그날(local_date) 끼니들. 먹은 시각 순.
+export async function findEntriesOn(userId: string, date: string): Promise<MealEntryRow[]> {
+  const rows = await db().query(
+    `select ${ENTRY_COLUMNS} from kkilog.meal_entries
+     where user_id = $1 and local_date = $2 and deleted_at is null order by eaten_at`,
+    [userId, date],
+  );
+  return rows as MealEntryRow[];
+}
+
 export async function findEntryByRequestId(userId: string, clientRequestId: string): Promise<MealEntryRow | null> {
   const rows = await db().query(
     `select ${ENTRY_COLUMNS} from kkilog.meal_entries where user_id = $1 and client_request_id = $2`,

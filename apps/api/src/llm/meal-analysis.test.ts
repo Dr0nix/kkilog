@@ -2,7 +2,7 @@ import { normalizeMeal } from '@kkilog/domain';
 import { describe, expect, it } from 'vitest';
 import { mealAnalysisResponseJsonSchema, parseMealAnalysisOutput } from './meal-analysis';
 
-// 실제 Gemini 응답(prompts/meal-analysis/v1.md)에서 가져온 fixture
+// 실제 Gemini 응답에서 가져온 fixture(프롬프트 v1·v2 — 출력 스키마는 같다)
 const FIXTURES = {
   // 텍스트 "삶은 계란 3개, 더단백 프로틴음료 1개" (gemini-3.8-flash)
   text: JSON.stringify({
@@ -21,6 +21,21 @@ const FIXTURES = {
   }),
   // 텍스트 "오늘 기분 좋다" (gemini-3.5-flash-lite)
   notFood: JSON.stringify({ items: [], notes: '음식에 대한 설명이나 사진이 없어 분석할 수 없습니다.' }),
+  // 백반 사진(밥·국·제육볶음·반찬 6종) — v2: 그릇마다 항목 하나 (gemini-3.5-flash-lite)
+  baekban: JSON.stringify({
+    items: [
+      { name: '흰쌀밥', quantity: 1, unit: '공기', estimated_grams: 210, kcal: 300, carb_g: 65, protein_g: 6, fat_g: 1, confidence: 'high' },
+      { name: '콩나물국', quantity: 1, unit: '대접', estimated_grams: 250, kcal: 35, carb_g: 4, protein_g: 3, fat_g: 1, confidence: 'high' },
+      { name: '제육볶음', quantity: 1, unit: '접시', estimated_grams: 120, kcal: 240, carb_g: 6, protein_g: 18, fat_g: 15, confidence: 'medium' },
+      { name: '배추김치', quantity: 1, unit: '접시', estimated_grams: 40, kcal: 15, carb_g: 3, protein_g: 1, fat_g: 0, confidence: 'high' },
+      { name: '깍두기', quantity: 1, unit: '접시', estimated_grams: 40, kcal: 16, carb_g: 3, protein_g: 1, fat_g: 0, confidence: 'high' },
+      { name: '시금치나물', quantity: 1, unit: '접시', estimated_grams: 30, kcal: 20, carb_g: 2, protein_g: 1, fat_g: 1, confidence: 'medium' },
+      { name: '부추김치', quantity: 1, unit: '접시', estimated_grams: 30, kcal: 20, carb_g: 3, protein_g: 1, fat_g: 1, confidence: 'medium' },
+      { name: '깻잎장아찌', quantity: 1, unit: '접시', estimated_grams: 20, kcal: 35, carb_g: 5, protein_g: 1, fat_g: 1, confidence: 'medium' },
+      { name: '연근조림', quantity: 1, unit: '접시', estimated_grams: 30, kcal: 45, carb_g: 10, protein_g: 1, fat_g: 0, confidence: 'medium' },
+    ],
+    notes: '사진에 포함된 백반 정식의 밥, 국, 그리고 6가지 반찬을 각각 개별 접시 기준으로 양을 추정하였습니다.',
+  }),
 };
 
 describe('parseMealAnalysisOutput + normalizeMeal', () => {
@@ -34,6 +49,15 @@ describe('parseMealAnalysisOutput + normalizeMeal', () => {
   it('사진 + 보정 분석', () => {
     const meal = normalizeMeal(parseMealAnalysisOutput(FIXTURES.photoWithCorrection)?.items ?? []);
     expect(meal).toMatchObject({ ok: true, totals: { kcal: 450 } });
+  });
+
+  it('백반: 그릇마다 항목 하나, 합계는 서버 계산', () => {
+    const output = parseMealAnalysisOutput(FIXTURES.baekban);
+    expect(output?.items).toHaveLength(9);
+    expect(normalizeMeal(output?.items ?? [])).toMatchObject({
+      ok: true,
+      totals: { kcal: 726, carb_g: 101, protein_g: 33, fat_g: 20 },
+    });
   });
 
   it('음식이 아니면 빈 항목 + 합계 0 (ok로 저장)', () => {

@@ -7,9 +7,10 @@ import {
   type MealType,
 } from '@kkilog/contracts';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ApiError, UnauthorizedError, analyzeMeal, createMeal } from '../../src/api/client';
+import { ApiError, UnauthorizedError, analyzeMeal, createMeal, getMealAdvice } from '../../src/api/client';
+import { type AdviceView, MealAdviceCard } from '../../src/components/MealAdviceCard';
 import { MealResultCard } from '../../src/components/MealResultCard';
 import { defaultMealType } from '../../src/meal-type';
 import { type PickedPhoto, openAppSettings, pickPhoto } from '../../src/photo';
@@ -30,11 +31,35 @@ export default function RecordScreen() {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [permissionBlocked, setPermissionBlocked] = useState(false);
+  const [advice, setAdvice] = useState<AdviceView | null>(null);
 
   // 내용이 바뀌면 다른 기록이므로 id도 바꾼다. 같은 내용을 다시 보낼 때만 같은 id가 유지된다.
   useEffect(() => {
     setRequestId(newRequestId());
   }, [mealType, photo, text]);
+
+  // 조언은 현재 ok 분석에 붙는다. 재분석으로 분석이 바뀌면 새로 받고, 늦게 온 이전 분석의 조언은 버린다.
+  const okAnalysisAt = meal?.analysis?.status === 'ok' ? meal.analysis.created_at : null;
+  const adviceFor = useRef<string | null>(null);
+
+  async function loadAdvice(mealId: string, analysisAt: string) {
+    adviceFor.current = analysisAt;
+    setAdvice({ status: 'loading' });
+    try {
+      const res = await getMealAdvice(mealId);
+      if (adviceFor.current !== analysisAt) return;
+      setAdvice({ status: 'ok', text: res.advice.text });
+    } catch (e) {
+      if (adviceFor.current !== analysisAt) return;
+      if (e instanceof UnauthorizedError) return;
+      setAdvice({ status: 'failed' });
+    }
+  }
+
+  useEffect(() => {
+    if (meal && okAnalysisAt) void loadAdvice(meal.id, okAnalysisAt);
+    // meal 객체가 아니라 끼니·분석이 바뀔 때만 다시 받는다.
+  }, [meal?.id, okAnalysisAt]);
 
   function handleError(e: unknown, fallback = NETWORK_ERROR) {
     if (e instanceof UnauthorizedError) return; // client가 코드 입력 화면으로 보낸다
@@ -100,6 +125,8 @@ export default function RecordScreen() {
   }
 
   function startOver() {
+    adviceFor.current = null;
+    setAdvice(null);
     setMeal(null);
     setPhoto(null);
     setText('');
@@ -178,6 +205,15 @@ export default function RecordScreen() {
       ) : (
         <>
           <MealResultCard meal={meal} />
+
+          {analyzed && advice ? (
+            <MealAdviceCard
+              advice={advice}
+              onRetry={() => {
+                if (okAnalysisAt) void loadAdvice(meal.id, okAnalysisAt);
+              }}
+            />
+          ) : null}
 
           {!analyzed ? (
             <View style={styles.failed}>

@@ -13,3 +13,12 @@ export const MEAL_MAX_ITEMS = 30; // TODO: 확정 필요 — 임시값
 export const MEAL_ITEM_MAX_KCAL = 3000; // TODO: 확정 필요 — 임시값
 export const MEAL_ITEM_MAX_MACRO_G = 300; // TODO: 확정 필요 — 임시값 (탄·단·지 각각)
 export const MEAL_MAX_KCAL = 6000; // TODO: 확정 필요 — 임시값 (끼니 합계)
+
+// 탄단지 목표 비율 허용 범위(spec 7.1). 각각 정수 이 범위 안, 합 100이어야 한다. 어기면 응답 이상으로 보고 실패.
+export const MACRO_PCT_MIN = 5;
+export const MACRO_PCT_MAX = 80;
+
+// 1g당 kcal (spec 7.1 탄단지 그램 계산)
+export const KCAL_PER_G_CARB = 4;
+export const KCAL_PER_G_PROTEIN = 4;
+export const KCAL_PER_G_FAT = 9;

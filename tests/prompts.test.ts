@@ -12,6 +12,7 @@ const LOCKED: Record<string, string> = {
   'calorie-target/v2.md': '1bd7561eb9feb7dbe26b940fac6d55ecabd43c9bfee39ab68e73f280eb750359',
   'meal-analysis/v1.md': '4ae60e83295950690e88417365aee9eba10b483676b71812813e39277db2567e',
   'meal-analysis/v2.md': '3f0ff3c1a70156871085d3252ebcc169163e847fa9c53f0f2007be660acdb582',
+  'meal-advice/v1.md': '4ea622232b5e69018570b0541c0f6901cea572628c3f5a3a6aecd0ad5855034b',
 };
 
 const files = readdirSync(DIR, { withFileTypes: true })

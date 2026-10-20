@@ -42,6 +42,12 @@ const NUMBER_FIELDS: { key: NumberField; label: string; placeholder: string; key
 
 const DAYS_PER_MONTH = 30.44;
 
+const MACRO_ROWS = [
+  { label: '탄수화물', pct: 'carb_pct', g: 'carb_g' },
+  { label: '단백질', pct: 'protein_pct', g: 'protein_g' },
+  { label: '지방', pct: 'fat_pct', g: 'fat_g' },
+] as const;
+
 // 빈 칸은 NaN으로 넘겨 스키마가 거부하게 한다. 쉼표 소수점도 받는다.
 function toNumber(text: string): number {
   return text.trim() === '' ? Number.NaN : Number(text.replace(',', '.'));
@@ -177,11 +183,24 @@ export default function OnboardingScreen() {
 
 function Result({ target }: { target: CalorieTarget }) {
   const months = target.expected_days === null ? null : (target.expected_days / DAYS_PER_MONTH).toFixed(1);
+  const macros = target.macros;
 
   return (
     <View style={[styles.container, styles.center]}>
       <Text style={styles.label}>하루 목표 칼로리</Text>
       <Text style={styles.kcal}>{target.kcal.toLocaleString()} kcal</Text>
+
+      {macros ? (
+        <View style={styles.macros}>
+          {MACRO_ROWS.map(({ label, pct, g }) => (
+            <View key={label} style={styles.macro}>
+              <Text style={styles.macroLabel}>{label}</Text>
+              <Text style={styles.macroValue}>{Math.round(macros[g])}g</Text>
+              <Text style={styles.macroPct}>{macros[pct]}%</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {target.clamped ? (
         <Text style={styles.notice}>
@@ -223,6 +242,11 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16 },
   kcal: { fontSize: 40, fontWeight: '700' },
+  macros: { flexDirection: 'row', gap: 8 },
+  macro: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 8, backgroundColor: '#f4f4f4' },
+  macroLabel: { fontSize: 13, color: '#666' },
+  macroValue: { fontSize: 20, fontWeight: '600', marginTop: 2 },
+  macroPct: { fontSize: 12, color: '#999' },
   notice: { fontSize: 15, color: '#8a5a00', backgroundColor: '#fff4e0', padding: 12, borderRadius: 8 },
   help: { fontSize: 14, color: '#555' },
 });

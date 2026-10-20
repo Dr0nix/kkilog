@@ -4,3 +4,5 @@ export * from './errors';
 export * from './me';
 export * from './meals';
 export * from './onboarding';
+export * from './trend';
+export * from './weights';

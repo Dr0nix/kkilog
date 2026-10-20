@@ -13,7 +13,7 @@ export const ACTIVITY_LEVELS = [
 ] as const;
 
 // 소수 첫째 자리까지만 저장한다(numeric(4,1)).
-const oneDecimal = (min: number, max: number) =>
+export const oneDecimal = (min: number, max: number) =>
   z
     .number()
     .min(min)

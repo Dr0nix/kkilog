@@ -2,7 +2,10 @@ import 'server-only';
 import type { TrendResponse } from '@kkilog/contracts';
 import {
   type DailyWeight,
+  type GoalProgress,
   INTAKE_AVERAGE_DAYS,
+  type RecentMeal,
+  type TrendPoint,
   addDays,
   averageDailyIntake,
   goalProgress,
@@ -22,9 +25,9 @@ async function dailyWeights(userId: string): Promise<DailyWeight[]> {
 }
 
 // from~to(포함) 끼니마다 현재 ok 분석의 합계. ok 분석이 없는 끼니·지운 끼니는 뺀다(spec 5).
-async function mealTotals(userId: string, from: string, to: string) {
+export async function recentMeals(userId: string, from: string, to: string): Promise<RecentMeal[]> {
   const rows = await db()`
-    select e.local_date::text as date, a.kcal, a.carb_g, a.protein_g, a.fat_g
+    select e.local_date::text as date, e.meal_type, a.kcal, a.carb_g, a.protein_g, a.fat_g
     from kkilog.meal_entries e
     join lateral (
       select kcal, carb_g, protein_g, fat_g from kkilog.meal_analyses
@@ -33,6 +36,7 @@ async function mealTotals(userId: string, from: string, to: string) {
     where e.user_id = ${userId} and e.deleted_at is null and e.local_date between ${from} and ${to}`;
   return rows.map((row) => ({
     date: row.date as string,
+    mealType: row.meal_type as string,
     totals: {
       kcal: Number(row.kcal),
       carb_g: Number(row.carb_g),
@@ -42,6 +46,28 @@ async function mealTotals(userId: string, from: string, to: string) {
   }));
 }
 
+export type WeightProgress = {
+  points: TrendPoint[];
+  last: DailyWeight | null;
+  trendKg: number | null;
+  slope: number | null;
+  progress: GoalProgress | null;
+};
+
+// today까지의 체중 추세·기울기·목표 도달 예상(spec 7.2). 추세 화면과 조언(장기 맥락)이 같이 쓴다.
+export async function weightProgress(userId: string, today: string, targetWeightKg: number): Promise<WeightProgress> {
+  const daily = await dailyWeights(userId);
+  const points = weightTrend(daily, today);
+  const slope = trendSlopeKgPerWeek(points);
+  const first = daily[0];
+  const trendKg = points.at(-1)?.trendKg ?? null;
+  const progress =
+    first && trendKg !== null
+      ? goalProgress({ startKg: first.weightKg, trendKg, targetKg: targetWeightKg, slopeKgPerWeek: slope, today })
+      : null;
+  return { points, last: daily.at(-1) ?? null, trendKg, slope, progress };
+}
+
 export async function buildTrend(args: {
   userId: string;
   today: string;
@@ -49,26 +75,11 @@ export async function buildTrend(args: {
   targetWeightKg: number;
   timeZone: string;
 }): Promise<TrendResponse> {
-  const daily = await dailyWeights(args.userId);
-  const points = weightTrend(daily, args.today);
-  const slope = trendSlopeKgPerWeek(points);
-  const first = daily[0];
-  const last = daily.at(-1);
-  const trendKg = points.at(-1)?.trendKg ?? null;
-  const progress =
-    first && trendKg !== null
-      ? goalProgress({
-          startKg: first.weightKg,
-          trendKg,
-          targetKg: args.targetWeightKg,
-          slopeKgPerWeek: slope,
-          today: args.today,
-        })
-      : null;
+  const { points, last, trendKg, slope, progress } = await weightProgress(args.userId, args.today, args.targetWeightKg);
 
   // 오늘은 아직 끝나지 않아서 뺀다.
   const byDate = totalsByDate(
-    await mealTotals(args.userId, addDays(args.today, -INTAKE_AVERAGE_DAYS), addDays(args.today, -1)),
+    await recentMeals(args.userId, addDays(args.today, -INTAKE_AVERAGE_DAYS), addDays(args.today, -1)),
   );
   const targets = [...(await targetsOn(args.userId, [...byDate.keys()], args.timeZone)).values()].map((t) => t.kcal);
 

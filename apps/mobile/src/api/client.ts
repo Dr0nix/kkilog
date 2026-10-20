@@ -141,6 +141,8 @@ export type NewMeal = {
   text: string | null;
   // 보낸 순서가 사진 순서(첫 장이 대표). 최대 MEAL_PHOTOS_MAX장
   photoUris: readonly string[];
+  // 사용자가 고른 먹은 시각. null이면 서버가 지금으로 둔다
+  eatenAt: Date | null;
 };
 
 // multipart로 보낸다(XHR, sendMultipart 참고). Content-Type은 boundary와 함께 붙으므로 직접 지정하지 않는다.
@@ -149,6 +151,7 @@ export async function createMeal(meal: NewMeal): Promise<MealMutationResponse> {
   form.append(CREATE_MEAL_FIELDS.mealType, meal.mealType);
   form.append(CREATE_MEAL_FIELDS.clientRequestId, meal.clientRequestId);
   if (meal.text) form.append(CREATE_MEAL_FIELDS.text, meal.text);
+  if (meal.eatenAt) form.append(CREATE_MEAL_FIELDS.eatenAt, meal.eatenAt.toISOString());
   meal.photoUris.forEach((uri, i) => {
     // React Native의 FormData는 { uri, name, type }으로 파일을 붙인다. 같은 필드 이름으로 여러 번 붙인다.
     form.append(CREATE_MEAL_FIELDS.photo, { uri, name: `meal-${i}.jpg`, type: 'image/jpeg' } as unknown as Blob);

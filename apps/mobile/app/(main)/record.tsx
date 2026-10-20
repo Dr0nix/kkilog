@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { createMeal } from '../../src/api/client';
 import { errorMessage } from '../../src/api/errors';
+import { EatenAtPicker } from '../../src/components/EatenAtPicker';
 import { KeyboardScroll } from '../../src/components/KeyboardScroll';
 import { MealResultSection } from '../../src/components/MealResultSection';
 import { TextField } from '../../src/components/TextField';
@@ -22,6 +23,10 @@ type Busy = null | 'photo' | 'analyze';
 
 export default function RecordScreen() {
   const [mealType, setMealType] = useState<MealType>(() => defaultMealType(new Date()));
+  // 끼니 태그를 직접 골랐는지. 안 골랐으면 먹은 시각을 바꿀 때 태그도 그 시각에 맞춰 다시 고른다.
+  const [mealTypeTouched, setMealTypeTouched] = useState(false);
+  // 먹은 시각. null이면 기록하는 순간(지금)
+  const [eatenAt, setEatenAt] = useState<Date | null>(null);
   const [photos, setPhotos] = useState<PickedPhoto[]>([]);
   const [text, setText] = useState('');
   // 같은 기록을 다시 보낼 때는 같은 id를 써서 중복 기록을 막는다(spec 3). 새 기록을 시작할 때만 바꾼다.
@@ -36,7 +41,12 @@ export default function RecordScreen() {
   // 내용이 바뀌면 다른 기록이므로 id도 바꾼다. 같은 내용을 다시 보낼 때만 같은 id가 유지된다.
   useEffect(() => {
     setRequestId(newRequestId());
-  }, [mealType, photos, text]);
+  }, [mealType, photos, text, eatenAt]);
+
+  function changeEatenAt(next: Date | null) {
+    setEatenAt(next);
+    if (!mealTypeTouched) setMealType(defaultMealType(next ?? new Date()));
+  }
 
   async function choosePhoto(source: 'camera' | 'library') {
     setError(null);
@@ -58,7 +68,7 @@ export default function RecordScreen() {
     setError(null);
     setBusy('analyze');
     try {
-      const res = await createMeal({ mealType, clientRequestId: requestId, text: text.trim() || null, photoUris: photos.map((p) => p.uri) });
+      const res = await createMeal({ mealType, clientRequestId: requestId, text: text.trim() || null, photoUris: photos.map((p) => p.uri), eatenAt });
       setFirstError(res.attempt?.status === 'failed' ? '분석하지 못했어요. 기록은 저장돼 있으니 다시 시도해 주세요.' : null);
       setMeal(res.meal);
     } catch (e) {
@@ -75,6 +85,8 @@ export default function RecordScreen() {
     setText('');
     setError(null);
     setMealType(defaultMealType(new Date()));
+    setMealTypeTouched(false);
+    setEatenAt(null);
   }
 
   const canSubmit = (photos.length > 0 || text.trim() !== '') && busy === null;
@@ -96,13 +108,18 @@ export default function RecordScreen() {
               <Pressable
                 key={type}
                 style={[styles.chip, mealType === type && styles.chipSelected]}
-                onPress={() => setMealType(type)}
+                onPress={() => {
+                  setMealType(type);
+                  setMealTypeTouched(true);
+                }}
                 disabled={busy !== null}
               >
                 <Text style={[styles.chipText, mealType === type && styles.chipTextSelected]}>{MEAL_TYPE_LABELS[type]}</Text>
               </Pressable>
             ))}
           </View>
+
+          <EatenAtPicker value={eatenAt} onChange={changeEatenAt} disabled={busy !== null} />
 
           {photos.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>

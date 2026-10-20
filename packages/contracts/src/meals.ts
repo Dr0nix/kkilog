@@ -1,0 +1,122 @@
+import { z } from 'zod';
+
+export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'late_night', 'snack'] as const;
+export type MealType = (typeof MEAL_TYPES)[number];
+
+export const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  breakfast: '아침',
+  lunch: '점심',
+  dinner: '저녁',
+  late_night: '야식',
+  snack: '간식',
+};
+
+export const MEAL_TEXT_MAX_LENGTH = 500;
+export const CORRECTION_TEXT_MAX_LENGTH = 200;
+
+// POST /api/meals 는 multipart/form-data. 사진은 앱에서 긴 변 1024px JPEG로 줄여서 보낸다(spec 3).
+export const CREATE_MEAL_FIELDS = {
+  mealType: 'meal_type',
+  clientRequestId: 'client_request_id',
+  text: 'text', // 선택
+  photo: 'photo', // 선택, image/jpeg
+} as const;
+
+export const CreateMealFieldsSchema = z.object({
+  meal_type: z.enum(MEAL_TYPES),
+  client_request_id: z.uuid(),
+  // 빈 문자열은 없는 것으로 본다.
+  text: z
+    .string()
+    .trim()
+    .max(MEAL_TEXT_MAX_LENGTH)
+    .transform((value) => (value === '' ? null : value))
+    .nullable(),
+});
+
+// POST /api/meals/:id/analyze — 재시도(보정 없음) 또는 한 줄 보정으로 재분석
+export const AnalyzeMealRequestSchema = z.object({
+  correction_text: z.string().trim().min(1).max(CORRECTION_TEXT_MAX_LENGTH).optional(),
+});
+export type AnalyzeMealRequest = z.input<typeof AnalyzeMealRequestSchema>;
+
+export const MealItemSchema = z.object({
+  name: z.string(),
+  quantity: z.number(),
+  unit: z.string(),
+  estimated_grams: z.number(),
+  kcal: z.number(),
+  carb_g: z.number(),
+  protein_g: z.number(),
+  fat_g: z.number(),
+  confidence: z.enum(['high', 'medium', 'low']),
+});
+export type MealItem = z.infer<typeof MealItemSchema>;
+
+export const MealTotalsSchema = z.object({
+  kcal: z.number(),
+  carb_g: z.number(),
+  protein_g: z.number(),
+  fat_g: z.number(),
+});
+export type MealTotals = z.infer<typeof MealTotalsSchema>;
+
+// 분석 실패 사유. 앱은 사유와 상관없이 [재시도]를 보여준다.
+export const ANALYSIS_ERRORS = [
+  'GEMINI_UNAVAILABLE',
+  'INVALID_OUTPUT',
+  'TOO_MANY_ITEMS',
+  'INVALID_VALUE',
+  'ITEM_ABOVE_MAX',
+  'TOTAL_ABOVE_MAX',
+] as const;
+export type AnalysisError = (typeof ANALYSIS_ERRORS)[number];
+
+export const MealAnalysisSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ok'),
+    items: z.array(MealItemSchema),
+    totals: MealTotalsSchema,
+    notes: z.string().nullable(),
+    correction_text: z.string().nullable(),
+    created_at: z.string(),
+  }),
+  z.object({
+    status: z.literal('failed'),
+    error: z.enum(ANALYSIS_ERRORS),
+    correction_text: z.string().nullable(),
+    created_at: z.string(),
+  }),
+]);
+export type MealAnalysis = z.infer<typeof MealAnalysisSchema>;
+
+export const MealSchema = z.object({
+  id: z.uuid(),
+  meal_type: z.enum(MEAL_TYPES),
+  local_date: z.string(),
+  eaten_at: z.string(),
+  input_text: z.string().nullable(),
+  // 짧게 유효한 서명 URL(spec 5). 사진이 없으면 null
+  photo_url: z.string().nullable(),
+  // 현재 분석 = 가장 최근 ok 분석, 없으면 가장 최근 분석(실패), 분석이 아직 없으면 null
+  analysis: MealAnalysisSchema.nullable(),
+});
+export type Meal = z.infer<typeof MealSchema>;
+
+// GET /api/meals/:id
+export const MealResponseSchema = z.object({ meal: MealSchema });
+export type MealResponse = z.infer<typeof MealResponseSchema>;
+
+// POST /api/meals, POST /api/meals/:id/analyze
+// attempt: 이번 요청에서 한 분석 결과. 재분석이 실패해도 meal.analysis는 이전 ok 분석을 유지한다.
+// 같은 client_request_id 재요청이면 새로 분석하지 않으므로 attempt는 null.
+export const MealMutationResponseSchema = z.object({
+  meal: MealSchema,
+  attempt: z
+    .discriminatedUnion('status', [
+      z.object({ status: z.literal('ok') }),
+      z.object({ status: z.literal('failed'), error: z.enum(ANALYSIS_ERRORS) }),
+    ])
+    .nullable(),
+});
+export type MealMutationResponse = z.infer<typeof MealMutationResponseSchema>;

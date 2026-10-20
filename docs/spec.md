@@ -53,6 +53,7 @@
 ### 2.4 기록하기
 - 끼니 태그(필수): 아침 / 점심 / 저녁 / 야식 / 간식. 현재 시각으로 기본 선택해 두고(5~10시 아침, 10~15시 점심, 15~17시 간식, 17~21시 저녁, 그 외 야식) 사용자가 바꿀 수 있다
 - 카메라·앨범 권한을 거부하면 안내를 보이고, 다시 물어볼 수 없게 거부됐으면 [설정에서 켜기]로 앱 설정을 연다
+- 먹은 시각: 기본은 기록하는 순간. [바꾸기]로 날짜(오늘·어제·그제)와 시각(HH:mm)을 고를 수 있다(놓친 끼니를 나중에 적는 경우). 그 끼니의 날짜(`local_date`)는 먹은 시각으로 정한다. 끼니 태그를 직접 고르지 않았으면 바꾼 시각에 맞춰 태그도 다시 고른다. 이미 기록한 끼니의 시각은 아직 바꿀 수 없다
 - [카메라] / [앨범] 버튼 + 텍스트 칸(선택). 사진 없이 텍스트만도 가능
 - 사진은 한 끼에 최대 5장(앨범은 여러 장을 한 번에, 카메라는 한 장씩 추가). 상차림을 나눠 찍었거나 같은 음식을 가까이서 찍은 사진도 같이 올리고, 분석은 겹친 음식을 한 번만 센다(6.1). 첫 장이 대표 사진(홈 목록 썸네일)
 - [분석] → 원본 저장 → 분석 → 결과 카드(음식별 추정치 + 합계 + 추정 근거 메모)
@@ -332,7 +333,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리·탄단지 비율(하한 보정, 그램은 서버 계산) → 한 트랜잭션 저장. 응답에 목표 칼로리·탄단지 목표(g)·하한 보정 여부·예상 도달 기간. 이미 있으면 `409 PROFILE_EXISTS`(Gemini 호출 전에 확인), Gemini 실패·응답 이상·상한 초과면 `503 UPSTREAM_UNAVAILABLE` |
 | GET/PATCH | /api/profile | 조회 → `{ profile(나이는 오늘 기준, 최근 체중 포함), calorie_target(현재 목표) }`. 수정은 바꾼 항목만(몸무게 제외) → `{ profile, new_calorie_target }`. 목표 칼로리 관련 항목이 실제로 바뀌면 최근 체중으로 Gemini가 목표를 다시 정하고(목표 기간은 지금부터) 프로필과 한 트랜잭션으로 저장, 아니면 `new_calorie_target: null`. Gemini 실패면 `503`(아무것도 저장 안 함) |
 | GET | /api/home?date= | 해당일(없으면 오늘) 섭취 합계·목표(그날 유효했던 행)·끼니 목록(먹은 시각 순, 각 끼니는 `GET /api/meals/:id`와 같은 형태)·체중(그날 기록 여부, 그날까지 최근 실측) |
-| POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 같은 이름으로 최대 5번, 장당 3MB·합계 4MB 이하, 보낸 순서가 사진 순서) — 사진과 텍스트 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
+| POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `eaten_at?`(ISO 8601 먹은 시각, 없으면 지금. 미래·7일보다 오래 전은 400 — 7일은 임시값), `photo?`(image/jpeg, 같은 이름으로 최대 5번, 장당 3MB·합계 4MB 이하, 보낸 순서가 사진 순서) — 사진과 텍스트 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
 | GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL(`photo_urls` 순서대로, `photo_url`은 첫 장 — 예전 앱 호환) |
 | POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |
 | POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2) → `{ advice: { text, analysis_created_at, created_at } }`. 현재 ok 분석이 없으면 `409 ANALYSIS_REQUIRED`, Gemini 실패·응답 이상이면 `503 UPSTREAM_UNAVAILABLE`(저장 안 함) |

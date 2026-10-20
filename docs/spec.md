@@ -44,7 +44,8 @@
 
 ### 2.3 홈 (대시보드)
 - 오늘 섭취 kcal / 목표 kcal, 탄·단·지 합계 / 탄·단·지 목표
-- 오늘 끼니 목록(끼니 태그, 사진 썸네일, 음식명, kcal) → 탭하면 상세
+- 오늘 끼니 목록(끼니 태그, 사진 썸네일, 음식명, kcal) → 탭하면 상세(결과·조언·[다시 분석]·지우기)
+- 날짜를 앞뒤로 넘겨 지난 날을 볼 수 있다(체중 기록은 오늘 화면에서만)
 - 분석 실패한 끼니도 목록에 [분석 실패 · 재시도] 표시로 보이되, 합계에선 빠진다
 - 체중: 오늘 기록 여부, [체중 기록] 버튼
 - 하단 큰 버튼: [기록하기]
@@ -317,8 +318,8 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | GET | /api/health | 배포 확인용 `{ ok: true }` (인증 없음, 개인 데이터 없음) |
 | GET | /api/me | Bearer 코드 확인 → `has_profile`. 없거나 폐기된 코드면 401 |
 | POST | /api/onboarding | 프로필(운동 정도·목표 기간 포함) + 첫 체중 → Gemini 목표 칼로리·탄단지 비율(하한 보정, 그램은 서버 계산) → 한 트랜잭션 저장. 응답에 목표 칼로리·탄단지 목표(g)·하한 보정 여부·예상 도달 기간. 이미 있으면 `409 PROFILE_EXISTS`(Gemini 호출 전에 확인), Gemini 실패·응답 이상·상한 초과면 `503 UPSTREAM_UNAVAILABLE` |
-| GET/PATCH | /api/profile | 프로필 조회·수정. 목표 칼로리 관련 항목이 바뀌면 목표 칼로리를 다시 정해 함께 저장 |
-| GET | /api/home?date= | 해당일 섭취 합계·목표·끼니 목록(태그, 서명 사진 URL, 분석 상태)·체중 기록 여부 |
+| GET/PATCH | /api/profile | 조회 → `{ profile(나이는 오늘 기준, 최근 체중 포함), calorie_target(현재 목표) }`. 수정은 바꾼 항목만(몸무게 제외) → `{ profile, new_calorie_target }`. 목표 칼로리 관련 항목이 실제로 바뀌면 최근 체중으로 Gemini가 목표를 다시 정하고(목표 기간은 지금부터) 프로필과 한 트랜잭션으로 저장, 아니면 `new_calorie_target: null`. Gemini 실패면 `503`(아무것도 저장 안 함) |
+| GET | /api/home?date= | 해당일(없으면 오늘) 섭취 합계·목표(그날 유효했던 행)·끼니 목록(먹은 시각 순, 각 끼니는 `GET /api/meals/:id`와 같은 형태)·체중(그날 기록 여부, 그날까지 최근 실측) |
 | POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 3MB 이하) — 둘 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
 | GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL |
 | POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |

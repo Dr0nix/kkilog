@@ -20,6 +20,7 @@ export const CREATE_MEAL_FIELDS = {
   clientRequestId: 'client_request_id',
   text: 'text', // 선택
   photo: 'photo', // 선택, image/jpeg. 같은 이름으로 여러 번(최대 MEAL_PHOTOS_MAX장), 보낸 순서가 사진 순서
+  eatenAt: 'eaten_at', // 선택, 먹은 시각(ISO 8601). 없으면 지금. 그날(local_date)도 이 시각으로 정한다
 } as const;
 
 // 한 끼 사진 장수와 크기(spec 2.4). 전체 한도는 Vercel 함수 요청 본문 한도(4.5MB)보다 작게 잡는다.
@@ -37,6 +38,8 @@ export const CreateMealFieldsSchema = z.object({
     .max(MEAL_TEXT_MAX_LENGTH)
     .transform((value) => (value === '' ? null : value))
     .nullable(),
+  // 허용 범위(미래 금지, 며칠 전까지)는 서버가 domain에서 검사한다.
+  eaten_at: z.iso.datetime({ offset: true }).nullable(),
 });
 
 // POST /api/meals/:id/analyze — 재시도(보정 없음) 또는 한 줄 보정으로 재분석

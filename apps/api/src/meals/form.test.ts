@@ -25,6 +25,7 @@ describe('parseCreateMealForm', () => {
       clientRequestId: REQUEST_ID,
       text: '김밥 한 줄',
       photos: [],
+      eatenAt: null,
     });
   });
 
@@ -42,6 +43,21 @@ describe('parseCreateMealForm', () => {
   it('전체 크기 한도까지는 받는다', () => {
     const size = Math.floor(MEAL_PHOTOS_MAX_TOTAL_BYTES / 2);
     expect(parseCreateMealForm(form([...base, ...photos(2, size)]))?.photos).toHaveLength(2);
+  });
+
+  it('먹은 시각을 고르면 그 시각(과거, 시간대 포함 ISO)', () => {
+    const now = new Date('2026-10-20T12:00:00Z');
+    const result = parseCreateMealForm(form([...base, ['text', 'x'], ['eaten_at', '2026-10-19T12:30:00+09:00']]), now);
+    expect(result?.eatenAt?.toISOString()).toBe('2026-10-19T03:30:00.000Z');
+  });
+
+  it.each([
+    ['ISO 형식이 아님', '어제 점심'],
+    ['미래', '2026-10-20T13:00:00Z'],
+    ['너무 오래 전', '2026-09-01T12:00:00Z'],
+  ])('먹은 시각이 %s → null', (_name, value) => {
+    const now = new Date('2026-10-20T12:00:00Z');
+    expect(parseCreateMealForm(form([...base, ['text', 'x'], ['eaten_at', value]]), now)).toBeNull();
   });
 
   it.each([

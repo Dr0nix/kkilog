@@ -37,3 +37,8 @@ export const INTAKE_AVERAGE_DAYS = 7;
 export const PATTERN_OVER_KCAL_RATIO = 1.1; // TODO: 확정 필요 — 임시값 (하루 섭취가 목표 kcal × 이 값을 넘으면 "목표 초과한 날")
 export const PATTERN_PROTEIN_SHORT_RATIO = 0.8; // TODO: 확정 필요 — 임시값 (단백질이 목표 × 이 값보다 적으면 "단백질 부족한 날")
 export const PATTERN_MIN_DAYS = 3; // TODO: 확정 필요 — 임시값 (최근 기록에서 같은 일이 이만큼 반복돼야 조언에서 짚는다. 기록한 날도 이만큼은 있어야 함)
+
+// 끼니 먹은 시각(spec 2.4). 놓친 끼니를 나중에 적을 수 있게 과거 시각을 받되 이 기간까지만.
+export const MEAL_EATEN_AT_MAX_PAST_DAYS = 7; // TODO: 확정 필요 — 임시값
+// 기기 시계가 조금 빠른 경우를 봐준다.
+export const MEAL_EATEN_AT_FUTURE_SKEW_MS = 5 * 60 * 1000;

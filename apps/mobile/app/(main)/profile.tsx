@@ -13,17 +13,16 @@ import {
   ActivityIndicator,
   type KeyboardTypeOptions,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { ApiError, getProfile, updateProfile } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
+import { KeyboardScroll } from '../../src/components/KeyboardScroll';
 import { TextField } from '../../src/components/TextField';
 import { formatKg } from '../../src/format';
 import { type Form, type NumberField, changes, toForm } from '../../src/profile-form';
-import { useScreenPadding } from '../../src/safe-area';
 
 const NUMBER_FIELDS: { key: NumberField; label: string; keyboard: KeyboardTypeOptions }[] = [
   { key: 'age', label: '나이', keyboard: 'number-pad' },
@@ -61,7 +60,6 @@ function TargetSummary({ target }: { target: CurrentCalorieTarget | CalorieTarge
 // 프로필 수정(spec 2.2). 몸무게는 고치지 않고 체중 기록으로 남긴다.
 // 목표 칼로리에 영향을 주는 항목을 바꾸면 최근 체중으로 목표를 다시 정한다.
 export default function ProfileScreen() {
-  const screenPadding = useScreenPadding(16, 48);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [target, setTarget] = useState<CurrentCalorieTarget | CalorieTarget | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -127,7 +125,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll contentContainerStyle={styles.container} paddingTop={16} paddingBottom={48}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -217,7 +215,7 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       ) : null}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

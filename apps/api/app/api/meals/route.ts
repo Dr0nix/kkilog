@@ -39,11 +39,12 @@ export async function POST(request: Request) {
   );
 
   // 끼니와 사진 행을 한 문장으로 넣는다(둘 중 하나만 저장되는 일이 없게). 첫 사진은 대표 사진으로 photo_path에도 둔다.
-  const now = new Date();
+  // 먹은 시각을 고르지 않았으면 지금. 그날(local_date)은 먹은 시각으로 정한다(놓친 끼니를 나중에 적는 경우).
+  const eatenAt = input.eatenAt ?? new Date();
   const inserted = await db()`
     with entry as (
       insert into kkilog.meal_entries (id, user_id, client_request_id, local_date, eaten_at, meal_type, input_text, photo_path)
-      values (${entryId}, ${userId}, ${input.clientRequestId}, ${localDate(now, timezone)}, ${now.toISOString()},
+      values (${entryId}, ${userId}, ${input.clientRequestId}, ${localDate(eatenAt, timezone)}, ${eatenAt.toISOString()},
               ${input.mealType}, ${input.text}, ${photoPaths[0] ?? null})
       on conflict (user_id, client_request_id) do nothing
       returning id, meal_type, local_date::text as local_date, eaten_at, input_text, photo_path

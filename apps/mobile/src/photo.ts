@@ -9,7 +9,8 @@ const JPEG_QUALITY = 0.7;
 export type PickedPhoto = { uri: string; width: number; height: number };
 
 export type PickResult =
-  | { status: 'picked'; photo: PickedPhoto }
+  // 고른 순서대로. 카메라는 늘 1장
+  | { status: 'picked'; photos: PickedPhoto[] }
   | { status: 'cancelled' }
   // 다시 물어볼 수 없게 거부됨 → 설정 화면으로 보내야 한다
   | { status: 'blocked' }
@@ -28,16 +29,24 @@ async function ensurePermission(source: 'camera' | 'library'): Promise<'granted'
   return asked.canAskAgain ? 'denied' : 'blocked';
 }
 
-export async function pickPhoto(source: 'camera' | 'library'): Promise<PickResult> {
+// 앨범은 limit장까지 한 번에 고를 수 있다(한 끼 사진 최대 장수에서 이미 고른 만큼 뺀 값).
+export async function pickPhotos(source: 'camera' | 'library', limit: number): Promise<PickResult> {
   const permission = await ensurePermission(source);
   if (permission !== 'granted') return { status: permission };
 
   const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1, exif: false };
   const result =
-    source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
-  const asset = result.canceled ? undefined : result.assets[0];
-  if (!asset) return { status: 'cancelled' };
-  return { status: 'picked', photo: await shrink(asset) };
+    source === 'camera'
+      ? await ImagePicker.launchCameraAsync(options)
+      : await ImagePicker.launchImageLibraryAsync({
+          ...options,
+          allowsMultipleSelection: limit > 1,
+          selectionLimit: limit,
+          orderedSelection: true,
+        });
+  const assets = result.canceled ? [] : result.assets.slice(0, limit);
+  if (assets.length === 0) return { status: 'cancelled' };
+  return { status: 'picked', photos: await Promise.all(assets.map(shrink)) };
 }
 
 async function shrink(asset: { uri: string; width: number; height: number }): Promise<PickedPhoto> {

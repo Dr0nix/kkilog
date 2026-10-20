@@ -1,9 +1,8 @@
 import 'server-only';
 import { GoogleGenAI } from '@google/genai';
-import { retryDelayMs } from '../llm/retry';
+import { attemptTimeoutMs, retryDelayMs } from '../llm/retry';
 
-// 시도 2번 + 429 대기 1번이 라우트 maxDuration(60초) 안에 들어가게 잡는다.
-const TIMEOUT_MS = 18_000;
+// 429 대기는 이만큼까지만. 대기 뒤에도 남은 예산이 있어야 재시도한다(attemptTimeoutMs).
 const MAX_RETRY_WAIT_MS = 20_000;
 
 let client: GoogleGenAI | undefined;
@@ -35,7 +34,8 @@ export type GeminiJsonResult = {
 
 export type GeminiImage = { mimeType: string; base64: string };
 
-// 구조화 출력(JSON) 한 번 호출. 429·5xx·타임아웃은 1회만 재시도한다(spec 6).
+// 구조화 출력(JSON) 한 번 호출. 429·5xx·타임아웃은 1회만 재시도하되, 호출 전체 예산(GEMINI_BUDGET_MS) 안에서만 한다(spec 6).
+// 시도마다 짧게 끊지 않고 한 시도에 최대 GEMINI_MAX_ATTEMPT_MS까지 기다린다(Gemini가 느린 날 25~30초 걸림).
 // input은 JSON 문자열로, images는 그 앞에 붙여 보낸다.
 export async function generateJson(args: {
   systemInstruction: string;
@@ -48,7 +48,10 @@ export async function generateJson(args: {
     ...(args.images ?? []).map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.base64 } })),
     { text: JSON.stringify(args.input) },
   ];
+  const startedAt = Date.now();
   for (let attempt = 1; ; attempt++) {
+    // 첫 시도는 늘 가능하다(경과 0). 재시도는 아래에서 예산을 확인한 뒤에만 온다.
+    const timeoutMs = attemptTimeoutMs(Date.now() - startedAt) ?? 0;
     try {
       const response = await gemini().models.generateContent({
         model,
@@ -58,7 +61,7 @@ export async function generateJson(args: {
           temperature: 0,
           responseMimeType: 'application/json',
           responseJsonSchema: args.responseJsonSchema,
-          abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+          abortSignal: AbortSignal.timeout(timeoutMs),
         },
       });
       const text = response.text;
@@ -66,7 +69,8 @@ export async function generateJson(args: {
       return { model, text, raw: { text, usage: response.usageMetadata, model_version: response.modelVersion } };
     } catch (error) {
       const waitMs = attempt === 1 ? retryDelayMs(error, MAX_RETRY_WAIT_MS) : null;
-      if (waitMs !== null) {
+      // 기다린 뒤에도 한 번 더 시도할 시간이 남아 있을 때만 재시도한다.
+      if (waitMs !== null && attemptTimeoutMs(Date.now() - startedAt + waitMs) !== null) {
         await new Promise((resolve) => setTimeout(resolve, waitMs));
         continue;
       }

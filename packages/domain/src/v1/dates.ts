@@ -35,3 +35,15 @@ export function daysUntilMonthsLater(onDate: string, months: number): number {
   const end = Date.UTC(year, targetMonth, Math.min(day, lastDay));
   return Math.round((end - Date.UTC(year, month - 1, day)) / DAY_MS);
 }
+
+// 해당 타임존 기준 시각을 'HH:mm'(24시간)으로.
+export function localTime(instant: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instant);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('hour')}:${get('minute')}`;
+}

@@ -1,4 +1,4 @@
-import { addDays } from './dates';
+import { addDays, daysBetween } from './dates';
 import { type MealTotals, sumMeal } from './meal';
 import { TREND_ALPHA, TREND_ETA_MAX_DAYS, TREND_MIN_SPAN_DAYS, TREND_SLOPE_WINDOW_DAYS } from './params';
 
@@ -11,16 +11,22 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
 // 일별 체중의 지수이동평균(spec 7.2). 첫 기록일부터 until까지 하루씩 만든다.
-// 첫 추세값은 첫 체중. 기록이 있는 날만 trend += α × (체중 − trend).
+// 첫 추세값은 첫 체중. 기록이 있는 날만 갱신하되, 직전 기록과 n일 떨어져 있으면
+// α_eff = 1 − (1 − α)^n을 써서 건너뛴 날만큼 따라잡는다(매일 기록하면 n = 1이라 α 그대로).
 export function weightTrend(daily: readonly DailyWeight[], until: string): TrendPoint[] {
   const first = daily[0];
   if (!first) return [];
   const byDate = new Map(daily.map((d) => [d.date, d.weightKg]));
   const points: TrendPoint[] = [];
   let trend = first.weightKg;
+  let lastRecorded = first.date;
   for (let date = first.date; date <= until; date = addDays(date, 1)) {
     const weight = byDate.get(date) ?? null;
-    if (weight !== null) trend += TREND_ALPHA * (weight - trend);
+    if (weight !== null) {
+      const n = daysBetween(lastRecorded, date);
+      trend += (1 - (1 - TREND_ALPHA) ** n) * (weight - trend);
+      lastRecorded = date;
+    }
     points.push({ date, weightKg: weight, trendKg: round2(trend) });
   }
   return points;

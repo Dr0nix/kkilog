@@ -50,6 +50,31 @@ describe('weightTrend', () => {
     expect(points[4]?.trendKg).toBe(points[2]?.trendKg);
   });
 
+  it('건너뛴 날이 있으면 간격 n일에 대해 α_eff = 1 − (1 − α)^n으로 갱신한다', () => {
+    const points = weightTrend(
+      [
+        { date: '2026-10-01', weightKg: 80 },
+        { date: '2026-10-04', weightKg: 77 },
+      ],
+      '2026-10-04',
+    );
+    expect(points[3]?.trendKg).toBe(round2(80 + (1 - (1 - TREND_ALPHA) ** 3) * (77 - 80)));
+  });
+
+  it('띄엄띄엄 기록해도 기울기가 매일 기록한 경우와 비슷하다', () => {
+    const days = 28;
+    const series = (step: number) =>
+      Array.from({ length: Math.floor(days / step) + 1 }, (_, i) => ({
+        date: addDays('2026-10-01', i * step),
+        weightKg: 80 - 0.1 * i * step,
+      }));
+    const until = addDays('2026-10-01', days);
+    const daily = trendSlopeKgPerWeek(weightTrend(series(1), until));
+    const everyOtherDay = trendSlopeKgPerWeek(weightTrend(series(2), until));
+    expect(daily).not.toBeNull();
+    expect(Math.abs((everyOtherDay ?? 0) - (daily ?? 0))).toBeLessThanOrEqual(0.05);
+  });
+
   it('기록이 없으면 빈 배열', () => {
     expect(weightTrend([], '2026-10-05')).toEqual([]);
   });

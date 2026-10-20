@@ -40,11 +40,24 @@ export const OnboardingRequestSchema = z.object({
 });
 export type OnboardingRequest = z.input<typeof OnboardingRequestSchema>;
 
+// 하루 탄단지 목표(spec 7.1). 비율은 Gemini가 정하고, 그램은 서버가 최종 kcal로 계산한다.
+export const MacroTargetSchema = z.object({
+  carb_pct: z.number().int(),
+  protein_pct: z.number().int(),
+  fat_pct: z.number().int(),
+  carb_g: z.number(),
+  protein_g: z.number(),
+  fat_g: z.number(),
+});
+export type MacroTarget = z.infer<typeof MacroTargetSchema>;
+
 export const CalorieTargetSchema = z.object({
   kcal: z.number().int(),
   // 하한으로 맞췄는지. true면 expected_days는 하한 기준 예상 기간(spec 7.1)
   clamped: z.boolean(),
   expected_days: z.number().int().nullable(),
+  // calorie-target/v1로 정한 목표엔 없다(null)
+  macros: MacroTargetSchema.nullable(),
   reason: z.string().nullable(),
 });
 export type CalorieTarget = z.infer<typeof CalorieTargetSchema>;

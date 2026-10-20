@@ -26,7 +26,8 @@
     },
     "updates": {
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/e94951f5-8ac2-48dc-97d8-4065e7f49e11"
     },
     "plugins": [
       "expo-router",
@@ -38,6 +39,12 @@
           "microphonePermission": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e94951f5-8ac2-48dc-97d8-4065e7f49e11"
+      }
+    },
+    "owner": "dr0nix"
   }
 }

@@ -6,9 +6,11 @@ import { ApiError, deleteMeal, getMeal } from '../../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../../src/api/errors';
 import { MealResultSection } from '../../../src/components/MealResultSection';
 import { formatTime } from '../../../src/format';
+import { useScreenPadding } from '../../../src/safe-area';
 
 // 홈 끼니 목록에서 들어오는 상세(spec 2.3). 결과·조언·다시 분석·삭제.
 export default function MealDetailScreen() {
+  const screenPadding = useScreenPadding(16, 24);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [meal, setMeal] = useState<Meal | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export default function MealDetailScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.container, screenPadding]} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ 뒤로</Text>
@@ -98,7 +100,7 @@ export default function MealDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingTop: 48, gap: 14 },
+  container: { padding: 20, gap: 14 },
   header: { gap: 8 },
   back: { fontSize: 16, color: '#555' },
   title: { fontSize: 22, fontWeight: '600' },

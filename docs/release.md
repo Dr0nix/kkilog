@@ -8,13 +8,13 @@ APK 빌드와 OTA 업데이트 방법. 지인에게 보낼 설치 안내는 [ins
 
 ## 처음 한 번
 1. https://expo.dev 에서 계정을 만든다.
-2. 로그인: `npx eas-cli@latest login`
+2. 로그인: `npx eas-cli@latest login` (구글로 가입했으면 브라우저에서 구글로 로그인. 비대화형 셸이면 `login --device --non-interactive`로 받은 주소를 브라우저에서 승인한 뒤 안내된 `--resume` 명령을 실행)
 3. 프로젝트 연결: `npx eas-cli@latest init`
    - Expo에 `kkilog` 프로젝트를 만들고, `app.json`에 `extra.eas.projectId`와 `owner`를 써 넣는다.
 4. 업데이트 연결: `npx eas-cli@latest update:configure`
    - `app.json`의 `updates.url`을 채운다. `runtimeVersion`은 이미 `appVersion` 정책으로 잡혀 있다.
 5. 운영 API 주소를 EAS 환경변수로 등록한다. **첫 빌드 전에 반드시** 해야 한다(빌드와 OTA 모두 이 값을 쓴다. 없으면 앱의 모든 요청이 실패한다).
-   - `npx eas-cli@latest env:create --name EXPO_PUBLIC_API_BASE_URL --value https://api-rouge-kappa-59.vercel.app --environment production --visibility plaintext`
+   - `npx eas-cli@latest env:set --name EXPO_PUBLIC_API_BASE_URL --value https://api-rouge-kappa-59.vercel.app --environment production --visibility plaintext --scope project`
    - 확인: `npx eas-cli@latest env:list --environment production`
    - 공개 값이라 plaintext로 둔다(APK 안에 그대로 들어간다). 앱에는 이 변수 말고 다른 환경변수를 넣지 않는다.
 6. 3·4에서 바뀐 `app.json`을 feature 브랜치 → `dev` PR로 커밋한다. 비밀 값이 아니다.

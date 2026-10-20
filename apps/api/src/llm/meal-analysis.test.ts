@@ -2,7 +2,7 @@ import { normalizeMeal } from '@kkilog/domain';
 import { describe, expect, it } from 'vitest';
 import { mealAnalysisResponseJsonSchema, parseMealAnalysisOutput } from './meal-analysis';
 
-// 실제 Gemini 응답에서 가져온 fixture(프롬프트 v1·v2 — 출력 스키마는 같다)
+// 실제 Gemini 응답에서 가져온 fixture(프롬프트 v1·v2 — 출력 스키마는 v3까지 같다)
 const FIXTURES = {
   // 텍스트 "삶은 계란 3개, 더단백 프로틴음료 1개" (gemini-3.8-flash)
   text: JSON.stringify({

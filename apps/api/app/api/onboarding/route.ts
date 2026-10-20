@@ -24,7 +24,7 @@ function isProfileConflict(error: unknown): boolean {
   );
 }
 
-// 프로필 + 첫 체중 + 목표 칼로리를 한 트랜잭션으로 저장한다(spec 2.2).
+// 프로필 + 첫 체중 + 목표 칼로리·탄단지 목표를 한 트랜잭션으로 저장한다(spec 2.2).
 // Gemini가 실패하면 아무것도 저장하지 않는다.
 export async function POST(request: Request) {
   const userId = await authenticate(request);
@@ -72,9 +72,12 @@ export async function POST(request: Request) {
         values (${userId}, ${crypto.randomUUID()}, ${today}, ${body.weight_kg}, 'onboarding')`,
       sql`
         insert into kkilog.calorie_targets
-          (user_id, kcal, llm_kcal, maintenance_kcal, clamped, reason, inputs, model_id, prompt_version, raw_response)
+          (user_id, kcal, llm_kcal, maintenance_kcal, clamped, carb_pct, protein_pct, fat_pct, carb_g, protein_g, fat_g,
+           reason, inputs, model_id, prompt_version, raw_response)
         values
-          (${userId}, ${target.kcal}, ${target.llmKcal}, ${target.maintenanceKcal}, ${target.clamped}, ${target.reason},
+          (${userId}, ${target.kcal}, ${target.llmKcal}, ${target.maintenanceKcal}, ${target.clamped},
+           ${target.macros.carbPct}, ${target.macros.proteinPct}, ${target.macros.fatPct},
+           ${target.macros.carbG}, ${target.macros.proteinG}, ${target.macros.fatG}, ${target.reason},
            ${JSON.stringify(target.inputs)}::jsonb, ${target.modelId}, ${target.promptVersion},
            ${JSON.stringify(target.raw)}::jsonb)`,
     ]);
@@ -88,6 +91,14 @@ export async function POST(request: Request) {
       kcal: target.kcal,
       clamped: target.clamped,
       expected_days: target.expectedDays,
+      macros: {
+        carb_pct: target.macros.carbPct,
+        protein_pct: target.macros.proteinPct,
+        fat_pct: target.macros.fatPct,
+        carb_g: target.macros.carbG,
+        protein_g: target.macros.proteinG,
+        fat_g: target.macros.fatG,
+      },
       reason: target.reason,
     },
   });

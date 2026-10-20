@@ -109,7 +109,8 @@ export function KeyboardScroll({
           style={[
             contentContainerStyle,
             {
-              paddingTop: paddingTop + insets.top,
+              // 상태 바는 루트 레이아웃이 비켜 준다(app/_layout.tsx)
+              paddingTop,
               paddingBottom: paddingBottom + (keyboardShown ? 0 : insets.bottom),
             },
           ]}

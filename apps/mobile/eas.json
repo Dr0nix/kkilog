@@ -1,0 +1,17 @@
+{
+  "cli": {
+    "version": ">= 25.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "production": {
+      "channel": "production",
+      "distribution": "internal",
+      "environment": "production",
+      "pnpm": "12.14.0",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}

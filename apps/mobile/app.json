@@ -7,7 +7,9 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -17,6 +19,16 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "끼니 사진을 고르려면 사진 접근 권한이 필요해요.",
+          "cameraPermission": "끼니 사진을 찍으려면 카메라 권한이 필요해요.",
+          "microphonePermission": false
+        }
+      ]
+    ]
   }
 }

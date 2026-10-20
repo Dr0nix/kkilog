@@ -79,7 +79,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - `apps/api/src/server/` — DB·Storage·Gemini 클라이언트, 인증 헬퍼 (`server-only`)
   - `apps/api/src/llm/` — LLM 출력 스키마(zod)·JSON Schema 변환·응답 파싱, 재시도 판단 (`server-only` 없음 — 유닛 테스트 대상)
   - `apps/api/src/server/{gemini,prompts,calorie-target,meal-analysis}.ts` — Gemini 호출, 프롬프트 로드, 분석 실행(`server-only`)
-  - `apps/api/prompts/meal-analysis/v1.md`, `apps/api/prompts/calorie-target/v1.md` — 프롬프트 원문 (용도별·버전별 파일, 기존 파일 수정 금지)
+  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v2.md`(v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v1.md`
   - `apps/api/scripts/access-code.ts` — 접속 코드 발급·폐기·조회(운영자가 직접 실행)
   - `packages/domain/src/v1/` — 순수 함수 + `params.ts`
   - `packages/contracts/src/` — API zod 스키마

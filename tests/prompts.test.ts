@@ -10,6 +10,7 @@ const DIR = resolve(import.meta.dirname, '..', 'apps', 'api', 'prompts');
 const LOCKED: Record<string, string> = {
   'calorie-target/v1.md': '0f0e347b29dec5377d3b7005408148db694684bb626d6a7d4a33839ee649a050',
   'meal-analysis/v1.md': '4ae60e83295950690e88417365aee9eba10b483676b71812813e39277db2567e',
+  'meal-analysis/v2.md': '3f0ff3c1a70156871085d3252ebcc169163e847fa9c53f0f2007be660acdb582',
 };
 
 const files = readdirSync(DIR, { withFileTypes: true })

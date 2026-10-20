@@ -80,7 +80,7 @@ APK (Expo) ──HTTPS + Bearer──▶ apps/api (Next.js Route Handler, Vercel
   - `apps/api/src/server/` — DB·Storage·Gemini 클라이언트, 인증 헬퍼 (`server-only`)
   - `apps/api/src/llm/` — LLM 출력 스키마(zod)·JSON Schema 변환·응답 파싱, 재시도 판단 (`server-only` 없음 — 유닛 테스트 대상)
   - `apps/api/src/server/{gemini,prompts,calorie-target,meal-analysis}.ts` — Gemini 호출, 프롬프트 로드, 분석 실행(`server-only`)
-  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v2.md`(v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v2.md`(v1에 탄단지 비율 추가)
+  - `apps/api/prompts/<용도>/v<번호>.md` — 프롬프트 원문(용도별·버전별 파일, 기존 파일 수정 금지 — `tests/prompts.test.ts`가 해시로 검사). 현재: `meal-analysis/v2.md`(v1은 반찬을 "반찬 3접시"처럼 묶어 써서 교체), `calorie-target/v2.md`(v1에 탄단지 비율 추가), `meal-advice/v1.md`
   - `apps/api/scripts/access-code.ts` — 접속 코드 발급·폐기·조회(운영자가 직접 실행)
   - `packages/domain/src/v1/` — 순수 함수 + `params.ts`
   - `packages/contracts/src/` — API zod 스키마
@@ -267,7 +267,9 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 - 입력(서버가 DB에서 모은다. 앱이 보낸 값은 쓰지 않음)
   - 이번 끼니: 끼니 태그, 먹은 시각, 음식별 추정치와 합계(서버 계산값)
   - 오늘(같은 `local_date`) 이 끼니 전에 먹은 끼니들: 태그·합계
-  - 오늘 합계(이번 끼니 포함)와 하루 목표(kcal·탄·단·지)
+  - 오늘 합계(이번 끼니 포함)와 하루 목표(kcal·탄·단·지), 목표까지 남은 양(목표 − 오늘 합계, 넘으면 음수)
+  - 합계·남은 양은 서버가 `packages/domain`으로 계산해 넣는다(모델에게 계산시키지 않음). 하루 목표는 조언을 만들 때의 현재 목표(가장 최근 `calorie_targets` 행)
+  - 조언에 쓴 입력은 `meal_advice.inputs`에 그대로 남긴다
 - Gemini 구조화 출력, temperature 0. 프롬프트는 `apps/api/prompts/meal-advice/v*.md`
 - LLM 출력 스키마: `{ "advice": "점심에 부족했던 단백질을 이번 끼니로 채웠어요. 남은 하루는 …" }`
 - 규칙: 한국어 1~3문장, 200자 이내. 오늘 목표 대비 부족·초과를 근거로 다음 끼니에 할 수 있는 구체적인 제안. 의학적 진단·처방은 하지 않는다.
@@ -299,7 +301,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 - 2차 후보: 섭취 기록 + 추세 변화로 실제 소비량을 역산하는 적응형 목표 (데이터 3주 이상 쌓인 뒤)
 
 ## 8. API (초안 — 형태 확정 시 `packages/contracts`로 고정)
-- 오류 응답은 `{ "error": { "code": ... } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 코드: `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `PROFILE_EXISTS`(409), `NOT_FOUND`(404), `INVALID_REQUEST`(400), `UPSTREAM_UNAVAILABLE`(503, Gemini 실패 — 잠시 후 재시도). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
+- 오류 응답은 `{ "error": { "code": ... } }` 하나로 통일한다(`packages/contracts`의 `ErrorResponseSchema`). 코드: `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `PROFILE_EXISTS`(409), `ANALYSIS_REQUIRED`(409, 조언을 받을 ok 분석이 없음), `NOT_FOUND`(404), `INVALID_REQUEST`(400), `UPSTREAM_UNAVAILABLE`(503, Gemini 실패 — 잠시 후 재시도). 개인 데이터·오류 응답 모두 `Cache-Control: private, no-store`.
 
 | Method | Path | 설명 |
 | --- | --- | --- |
@@ -311,7 +313,7 @@ create table meal_advice (                -- 캐시. 분석 1건당 조언 1건(
 | POST | /api/meals | multipart: `meal_type`, `client_request_id`(UUID), `text?`(500자), `photo?`(image/jpeg, 3MB 이하) — 둘 중 하나는 필수. 프로필 없으면 `409 ONBOARDING_REQUIRED`. 사진 업로드 → 원본 저장 → 분석 → `{ meal, attempt }`. 분석이 실패해도 200(`attempt.status = failed`, 실패 행 저장). 같은 `client_request_id`면 새로 만들지 않고 기존 끼니를 200(`attempt: null`) |
 | GET | /api/meals/:id | `{ meal }` — 현재 분석(가장 최근 ok, 없으면 가장 최근 실패, 분석 전이면 null) + 사진 서명 URL |
 | POST | /api/meals/:id/analyze | 재시도·재분석. JSON `{ correction_text? }`(200자). 없으면 마지막 분석의 보정을 그대로 쓴다. 새 분석 행을 쌓고 `{ meal, attempt }` — 재분석이 실패해도 `meal.analysis`는 이전 ok 분석 유지 |
-| POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2). 현재 ok 분석이 없으면 409, Gemini 실패면 `503 UPSTREAM_UNAVAILABLE` |
+| POST | /api/meals/:id/advice | 현재 분석 기준 영양 조언. 있으면 저장된 것, 없으면 생성(6.2) → `{ advice: { text, analysis_created_at, created_at } }`. 현재 ok 분석이 없으면 `409 ANALYSIS_REQUIRED`, Gemini 실패·응답 이상이면 `503 UPSTREAM_UNAVAILABLE`(저장 안 함) |
 | DELETE | /api/meals/:id | soft delete → 204. 지운 끼니는 없는 것으로 본다(이후 조회·재분석·삭제 404). 사진은 보관 기간 정책이 정해질 때까지 남긴다 |
 | POST | /api/weights | weight_kg, client_request_id. 중복이면 기존 기록 200 |
 | GET | /api/trend?days= | 체중 실측 + 추세 + 목표 도달 예상 + 7일 평균 섭취 |

@@ -1,5 +1,6 @@
 import type { Meal } from '@kkilog/contracts';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { MealPhotos } from './MealPhotos';
 
 const CONFIDENCE_LABELS = { high: '', medium: '추정', low: '불확실' } as const;
 
@@ -14,7 +15,7 @@ export function MealResultCard({ meal }: { meal: Meal }) {
 
   return (
     <View style={styles.card}>
-      {meal.photo_url ? <Image source={{ uri: meal.photo_url }} style={styles.photo} resizeMode="cover" /> : null}
+      <MealPhotos urls={meal.photo_urls} />
 
       <View style={styles.totals}>
         <Text style={styles.kcal}>{analysis.totals.kcal.toLocaleString()} kcal</Text>
@@ -54,7 +55,6 @@ export function MealResultCard({ meal }: { meal: Meal }) {
 
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 12, padding: 16, gap: 10, backgroundColor: '#fff' },
-  photo: { width: '100%', aspectRatio: 4 / 3, borderRadius: 8, backgroundColor: '#eee' },
   totals: { gap: 2 },
   kcal: { fontSize: 28, fontWeight: '700' },
   macros: { fontSize: 14, color: '#555' },

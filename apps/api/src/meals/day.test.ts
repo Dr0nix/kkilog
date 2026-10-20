@@ -7,6 +7,7 @@ const base = {
   local_date: '2026-10-20',
   eaten_at: '2026-10-20T03:00:00.000Z',
   input_text: 'x',
+  photo_urls: [] as string[],
   photo_url: null,
 } as const;
 

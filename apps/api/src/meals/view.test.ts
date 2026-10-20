@@ -50,13 +50,14 @@ describe('pickCurrentAnalysis', () => {
 
 describe('toMeal', () => {
   it('ok 분석: 합계는 숫자로, 시각은 ISO로', () => {
-    expect(toMeal(entry, [ok('2026-10-20T03:11:00Z', 420)], 'https://signed.example/photo')).toEqual({
+    expect(toMeal(entry, [ok('2026-10-20T03:11:00Z', 420)], ['https://signed.example/0', 'https://signed.example/1'])).toEqual({
       id: entry.id,
       meal_type: 'lunch',
       local_date: '2026-10-20',
       eaten_at: '2026-10-20T03:10:00.000Z',
       input_text: '김밥 한 줄',
-      photo_url: 'https://signed.example/photo',
+      photo_urls: ['https://signed.example/0', 'https://signed.example/1'],
+      photo_url: 'https://signed.example/0',
       analysis: {
         status: 'ok',
         items: ok('', 420).items,
@@ -69,18 +70,18 @@ describe('toMeal', () => {
   });
 
   it('실패 분석: 사유를 그대로, 모르는 사유는 INVALID_OUTPUT', () => {
-    expect(toMeal(entry, [failed('2026-10-20T03:12:00Z', 'TOTAL_ABOVE_MAX')], null).analysis).toEqual({
+    expect(toMeal(entry, [failed('2026-10-20T03:12:00Z', 'TOTAL_ABOVE_MAX')], []).analysis).toEqual({
       status: 'failed',
       error: 'TOTAL_ABOVE_MAX',
       correction_text: '반 줄만',
       created_at: '2026-10-20T03:12:00.000Z',
     });
-    expect(toMeal(entry, [failed('2026-10-20T03:12:00Z', 'SOMETHING_NEW')], null).analysis).toMatchObject({
+    expect(toMeal(entry, [failed('2026-10-20T03:12:00Z', 'SOMETHING_NEW')], []).analysis).toMatchObject({
       error: 'INVALID_OUTPUT',
     });
   });
 
   it('분석 전이면 analysis는 null', () => {
-    expect(toMeal(entry, [], null).analysis).toBeNull();
+    expect(toMeal(entry, [], []).analysis).toBeNull();
   });
 });

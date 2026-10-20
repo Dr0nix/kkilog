@@ -11,6 +11,7 @@ import {
   weightTrend,
 } from '@kkilog/domain';
 import { db } from './db';
+import { targetsOn } from './targets';
 
 // 하루 체중값 = 그날 가장 마지막 기록(spec 5). 추세는 처음부터 이어서 계산하므로 전체를 읽는다.
 async function dailyWeights(userId: string): Promise<DailyWeight[]> {
@@ -41,19 +42,6 @@ async function mealTotals(userId: string, from: string, to: string) {
   }));
 }
 
-// 날짜마다 그날이 끝날 때 유효했던 목표 kcal(spec 5: 과거 날짜는 그날 기준으로 유효했던 행).
-async function targetKcalByDate(userId: string, dates: readonly string[], timeZone: string): Promise<number[]> {
-  if (dates.length === 0) return [];
-  const rows = await db()`
-    select t.kcal from unnest(${dates}::date[]) as d(day)
-    join lateral (
-      select kcal from kkilog.calorie_targets
-      where user_id = ${userId} and created_at < ((d.day + 1)::timestamp at time zone ${timeZone})
-      order by created_at desc limit 1
-    ) t on true`;
-  return rows.map((row) => Number(row.kcal));
-}
-
 export async function buildTrend(args: {
   userId: string;
   today: string;
@@ -82,7 +70,7 @@ export async function buildTrend(args: {
   const byDate = totalsByDate(
     await mealTotals(args.userId, addDays(args.today, -INTAKE_AVERAGE_DAYS), addDays(args.today, -1)),
   );
-  const targets = await targetKcalByDate(args.userId, [...byDate.keys()], args.timeZone);
+  const targets = [...(await targetsOn(args.userId, [...byDate.keys()], args.timeZone)).values()].map((t) => t.kcal);
 
   const since = addDays(args.today, -(args.days - 1));
   return {

@@ -18,6 +18,7 @@ import { DailySummaryCard } from '../../src/components/DailySummaryCard';
 import { MealListItem } from '../../src/components/MealListItem';
 import { WeightRow } from '../../src/components/WeightRow';
 import { formatLocalDate, shiftLocalDate } from '../../src/format';
+import { PREFETCH_CONCURRENCY, prefetchTargets } from '../../src/home-prefetch';
 import { useScreenPadding } from '../../src/safe-area';
 import { isHorizontalSwipeStart, swipeDays } from '../../src/swipe';
 
@@ -33,16 +34,45 @@ export default function HomeScreen() {
   // 날짜를 빨리 넘기면 늦게 온 이전 날짜 응답은 버린다.
   const latestRequest = useRef(0);
 
-  const load = useCallback(async (target: string | null) => {
-    const request = ++latestRequest.current;
-    setError(null);
-    try {
-      const res = await getHome(target ?? undefined);
-      if (request === latestRequest.current) setHome(res);
-    } catch (e) {
-      if (request === latestRequest.current && shouldShowError(e)) setError(NETWORK_ERROR);
-    }
+  // 날짜별로 불러온 홈. 날짜를 넘기면 이걸 먼저 보여 주고(로딩 없이) 뒤에서 다시 불러와 최신으로 바꾼다.
+  // 사진 서명 URL은 10분 뒤 만료되지만 보여 줄 때마다 다시 불러오므로 새 URL로 바뀐다.
+  const cache = useRef(new Map<string, HomeResponse>());
+  const prefetching = useRef(new Set<string>());
+
+  // 보고 있는 날 이전 며칠을 조용히 미리 불러 둔다. 실패해도 그 날로 넘어갈 때 다시 불러오므로 무시한다.
+  const prefetch = useCallback(async (viewed: string) => {
+    const queue = prefetchTargets(viewed, (d) => cache.current.has(d) || prefetching.current.has(d));
+    queue.forEach((d) => prefetching.current.add(d));
+    const worker = async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        try {
+          const res = await getHome(next);
+          cache.current.set(res.date, res);
+        } catch {
+          // 무시
+        } finally {
+          prefetching.current.delete(next);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: PREFETCH_CONCURRENCY }, worker));
   }, []);
+
+  const load = useCallback(
+    async (target: string | null) => {
+      const request = ++latestRequest.current;
+      setError(null);
+      try {
+        const res = await getHome(target ?? undefined);
+        cache.current.set(res.date, res);
+        if (request === latestRequest.current) setHome(res);
+        void prefetch(res.date);
+      } catch (e) {
+        if (request === latestRequest.current && shouldShowError(e)) setError(NETWORK_ERROR);
+      }
+    },
+    [prefetch],
+  );
 
   // 기록·상세 화면에서 돌아오면 다시 불러온다.
   useFocusEffect(
@@ -61,7 +91,8 @@ export default function HomeScreen() {
     if (!home) return;
     if (days > 0 && home.date >= home.today) return; // 오늘보다 뒤로는 가지 않는다
     const next = shiftLocalDate(home.date, days);
-    setHome(null);
+    // 미리 불러 둔 날이면 바로 보여 준다(다시 불러오기는 date가 바뀌면 useFocusEffect가 한다).
+    setHome(cache.current.get(next) ?? null);
     setDate(next >= home.today ? null : next);
   }
 

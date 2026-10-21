@@ -1,7 +1,16 @@
 import type { HomeResponse } from '@kkilog/contracts';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  PanResponder,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getHome } from '../../src/api/client';
 import { NETWORK_ERROR, shouldShowError } from '../../src/api/errors';
@@ -10,6 +19,7 @@ import { MealListItem } from '../../src/components/MealListItem';
 import { WeightRow } from '../../src/components/WeightRow';
 import { formatLocalDate, shiftLocalDate } from '../../src/format';
 import { useScreenPadding } from '../../src/safe-area';
+import { isHorizontalSwipeStart, swipeDays } from '../../src/swipe';
 
 // 대시보드(spec 2.3). date가 null이면 오늘(서버 타임존 기준).
 export default function HomeScreen() {
@@ -49,6 +59,7 @@ export default function HomeScreen() {
 
   function move(days: number) {
     if (!home) return;
+    if (days > 0 && home.date >= home.today) return; // 오늘보다 뒤로는 가지 않는다
     const next = shiftLocalDate(home.date, days);
     setHome(null);
     setDate(next >= home.today ? null : next);
@@ -56,9 +67,28 @@ export default function HomeScreen() {
 
   const isToday = home ? home.date === home.today : true;
 
+  // 가로로 밀어 날짜 넘기기(오른쪽 = 전날, 왼쪽 = 다음 날). 미는 동안 내용이 손가락을 조금 따라온다.
+  // PanResponder는 한 번만 만들므로 최신 move를 ref로 부른다.
+  const moveRef = useRef(move);
+  moveRef.current = move;
+  const dragX = useRef(new Animated.Value(0)).current;
+  const swipe = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_e, g) => isHorizontalSwipeStart(g.dx, g.dy),
+      onPanResponderMove: (_e, g) => dragX.setValue(g.dx * 0.4),
+      onPanResponderRelease: (_e, g) => {
+        Animated.spring(dragX, { toValue: 0, useNativeDriver: true }).start();
+        const days = swipeDays(g.dx, g.vx);
+        if (days !== 0) moveRef.current(days);
+      },
+      onPanResponderTerminate: () => Animated.spring(dragX, { toValue: 0, useNativeDriver: true }).start(),
+    }),
+  ).current;
+
   return (
-    <View style={styles.screen}>
-      <ScrollView
+    <View style={styles.screen} {...swipe.panHandlers}>
+      <Animated.ScrollView
+        style={{ transform: [{ translateX: dragX }] }}
         contentContainerStyle={[styles.container, screenPadding]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
@@ -110,7 +140,7 @@ export default function HomeScreen() {
             </View>
           </>
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <View style={[styles.bottom, { paddingBottom: 20 + insets.bottom }]}>
         <Pressable style={styles.recordButton} onPress={() => router.push('/record')}>
